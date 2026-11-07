@@ -167,7 +167,7 @@ export class Hud {
 
     // labels on the finish line and the tower top
     const fl = $('#finish-label', this.root);
-    const fp = r.project(-LAYOUT.padHalf - 1.2, sim.finishY, -1.1);
+    const fp = r.project(-sim.layout.padHalf - 1.2, sim.finishY, -1.1);
     fl.style.transform = `translate(${fp.x}px, ${fp.y}px) translate(-100%, -50%)`;
     $('b', fl).textContent = `${sim.finishHeight} m`;
     fl.classList.toggle('over', h >= sim.finishHeight);

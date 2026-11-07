@@ -34,6 +34,17 @@ function placeHeld(sim, claw, x, ropeUp = 2.5) {
   return released;
 }
 
+console.log('The field fits a 16:9 screen, bar to grass');
+{
+  for (const n of [2, 4, 8]) {
+    const sim = new Sim({ finishHeight: 6 + 0.6 * n, players: n });
+    const L = sim.layout;
+    const outer = Math.abs(L.slot(n - 1).x1);
+    console.log(`   ${n} players: field ±${L.halfW.toFixed(1)} m, pad ±${L.padHalf.toFixed(1)} m, outermost shelf edge ${outer.toFixed(1)} m`);
+    ok(outer <= L.halfW && L.padHalf >= 5, `${n} players: every shelf on screen and a wide pad`);
+  }
+}
+
 console.log('Claw swing');
 {
   const sim = new Sim({ finishHeight: 8 });
@@ -60,7 +71,7 @@ console.log('Spawn, grab, carry, place');
   const p = sim.spawnOnPlatform(0, 'wood-cube', 0);
   ok(!!p, 'a cube spawns on the platform');
   run(sim, 1.5);
-  ok(Math.abs(p.body.getPosition().y - (LAYOUT.slot(0).top + 0.5)) < 0.05, `it rests on the platform (y=${p.body.getPosition().y.toFixed(2)})`);
+  ok(Math.abs(p.body.getPosition().y - (sim.layout.slot(0).top + 0.5)) < 0.05, `it rests on the platform (y=${p.body.getPosition().y.toFixed(2)})`);
   steerUntil(sim, claw, p.body.getPosition().x, 3, 10);
   claw.drop();
   run(sim, 8, () => claw.state === 'holding' && claw.auto === null ? false : undefined);
@@ -97,13 +108,13 @@ console.log('Stack ten cubes, spawned straight into the claw');
 
 console.log('A claw reaches a lower shelf under a higher one');
 {
-  const sim = new Sim({ finishHeight: 8 });
+  const sim = new Sim({ finishHeight: 8, players: 6 });
   const claw = sim.addPlayer(0);
   sim.addPlayer(2); sim.addPlayer(4); // the shelves above it, further out
   run(sim, 0.5);
   const p = sim.spawnOnPlatform(0, 'wood-short', 0);
   run(sim, 1.5);
-  ok(Math.abs(p.body.getPosition().y - (LAYOUT.slot(0).top + 0.25)) < 0.05, 'a beam spawns on the bottom shelf');
+  ok(Math.abs(p.body.getPosition().y - (sim.layout.slot(0).top + 0.25)) < 0.05, 'a beam spawns on the bottom shelf');
   claw.drop();
   run(sim, 8, () => (claw.state === 'holding' && !claw.auto ? false : undefined));
   ok(claw.hold?.piece === p, 'DROP reaches down past the upper shelves and grabs it');
@@ -157,7 +168,7 @@ console.log('An off-centre grab on a heavy girder slips; a centred one holds');
     const sim = new Sim({ finishHeight: 8 });
     const claw = sim.addPlayer(1);
     run(sim, 0.5);
-    const g = sim.createPiece('metal-girder', 1, claw.x + offset, LAYOUT.slot(0).top + 0.25, 0);
+    const g = sim.createPiece('metal-girder', 1, claw.x + offset, sim.layout.slot(0).top + 0.25, 0);
     run(sim, 1);
     claw.drop();
     run(sim, 8, () => (claw.state === 'holding' && !claw.auto ? false : undefined));
@@ -180,7 +191,7 @@ console.log('Turntable: rotate a piece sitting on the platform');
   run(sim, 1.5);
   ok(sim.turnPlatformPiece(0, 1) && sim.turnPlatformPiece(0, 1), 'the beam turns twice');
   run(sim, 2);
-  ok(Math.abs(Math.abs(p.body.getAngle()) - Math.PI / 2) < 0.08 || Math.abs(p.body.getPosition().y - LAYOUT.slot(0).top) < 3, `it stands on end or lies on the platform (angle ${(p.body.getAngle() * 180 / Math.PI).toFixed(0)}°)`);
+  ok(Math.abs(Math.abs(p.body.getAngle()) - Math.PI / 2) < 0.08 || Math.abs(p.body.getPosition().y - sim.layout.slot(0).top) < 3, `it stands on end or lies on the platform (angle ${(p.body.getAngle() * 180 / Math.PI).toFixed(0)}°)`);
 }
 
 console.log('Sticky goo glues');
@@ -261,20 +272,20 @@ console.log('Collapse and lost pieces');
   const ev = sim.drainEvents();
   ok(ev.some((e) => e.type === 'collapse'), 'knocking the stack over is spotted as a collapse');
   ok(ev.some((e) => e.type === 'impact'), 'and makes impact events');
-  const p = sim.createPiece('rubber-ball', 0, LAYOUT.groundHalf + 1, 3, 0);
+  const p = sim.createPiece('rubber-ball', 0, sim.layout.groundHalf + 1, 3, 0);
   run(sim, 3);
   ok(p.dead && sim.drainEvents().some((e) => e.type === 'remove' && e.reason === 'lost'), 'a piece off the edge is removed as lost');
 }
 
 console.log('Two claws share a heavy load');
 {
-  const sim = new Sim({ finishHeight: 8 });
+  const sim = new Sim({ finishHeight: 8, players: 4 });
   const a = sim.addPlayer(0), b = sim.addPlayer(2);
   run(sim, 0.5);
-  const slab = sim.createPiece('stone-slab', 0, -9, LAYOUT.padTop + 0.4, 0);
+  const slab = sim.createPiece('stone-slab', 0, -3, LAYOUT.padTop + 0.4, 0);
   run(sim, 1);
   const L = lenFor(sim, slab.top + 0.02);
-  steerUntil(sim, a, -10.1, 3, 12); steerUntil(sim, b, -7.9, 3, 12);
+  steerUntil(sim, a, -4.1, 3, 12); steerUntil(sim, b, -1.9, 3, 12);
   a.drop(); b.drop();
   run(sim, 8, () => (a.state === 'holding' && b.state === 'holding' && !a.auto && !b.auto ? false : undefined));
   ok(a.hold?.piece === slab && b.hold?.piece === slab, 'both claws hold the heavy base');

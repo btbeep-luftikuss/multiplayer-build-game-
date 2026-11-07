@@ -191,6 +191,8 @@ export class Game {
   // lobby world) when the line would get too close to it or too far below it
   refreshLobbyLine() {
     const h = finishHeightFor(this.activeCount, this.settings.difficulty);
+    const maxLevel = Math.max(0, ...[...this.players.values()].filter((p) => p.present).map((p) => Math.floor(p.slot / 2)));
+    if (maxLevel >= this.sim.layout.levels) { this.newSim(); return; }
     if (h === this.sim.finishHeight) return;
     const gap = this.sim.topY - (this.sim.finishY - this.sim.finishHeight + h);
     if (gap < 5.5 || gap > 8) this.newSim();
@@ -199,7 +201,7 @@ export class Game {
 
   newSim() {
     const h = finishHeightFor(this.activeCount, this.settings.difficulty);
-    this.sim = new Sim({ finishHeight: h });
+    this.sim = new Sim({ finishHeight: h, players: Math.max(2, this.activeCount) });
     for (const p of this.players.values()) if (p.present) this.sim.addPlayer(p.slot);
   }
 

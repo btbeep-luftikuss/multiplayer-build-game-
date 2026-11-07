@@ -11,22 +11,38 @@ const CAT = { STATIC: 0x1, PIECE: 0x2, CLAW: 0x4 };
 const DEG = Math.PI / 180;
 
 export const LAYOUT = {
-  padHalf: 12,         // the build pad runs from -12 to 12: most of the ground
   padTop: 0.3,
-  groundHalf: 23,
-  barHalf: 22.6,
   shelfW: 3,
   killY: -8,
-  // Spawn shelves out at the far left and right, alternating sides: solid steps rising like stairs
-  // towards the edges. Each higher step starts 1.8 m further out, so the step below keeps 1.8 m of
-  // open top for its pieces.
-  // x0/x1: the shelf's inner and outer ends; x: where new pieces arrive (the part a claw can reach).
-  slot(s) {
-    const side = s % 2 === 0 ? -1 : 1, level = Math.floor(s / 2);
-    const inner = 14 + level * 1.8;
-    return { side, level, top: 1.0 + level * 2.8, x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + 0.9) };
-  },
+  // how much of a 16:9 screen the play area gets (the height meter takes a strip at the side)
+  aspect: (16 / 9) * 0.93,
+  frameBottom: -1.4,   // the TV shows from the front of the grass…
+  frameTop: 1.1,       // …to just above the trolleys on the top bar
 };
+
+// Where everything goes for one round. The field is exactly as wide as a TV screen shows when the
+// top bar is at the top edge and the grass at the bottom. Spawn shelves sit at the far left and right,
+// alternating sides, as solid steps rising like stairs towards the edges; each higher step starts
+// 1.8 m further out, so the step below keeps 1.8 m of open top for its pieces. The build pad takes
+// everything in between.
+export function makeLayout(topY, players) {
+  const levels = Math.max(1, Math.ceil(players / 2));
+  const halfW = Math.max(9, (topY + LAYOUT.frameTop - LAYOUT.frameBottom) * LAYOUT.aspect / 2);
+  const step = 1.8;
+  const inner0 = halfW - 0.4 - LAYOUT.shelfW - (levels - 1) * step;
+  return {
+    halfW, levels,
+    padHalf: Math.max(3, inner0 - 1.4),
+    groundHalf: halfW + 3,
+    barHalf: halfW + 0.6,
+    // x0/x1: the shelf's inner and outer ends; x: where new pieces arrive (the part a claw can reach)
+    slot(s) {
+      const side = s % 2 === 0 ? -1 : 1, level = Math.floor(s / 2);
+      const inner = inner0 + level * step;
+      return { side, level, top: 1.0 + level * 2.8, x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + 0.9) };
+    },
+  };
+}
 
 export const CLAW = {
   hubHalfW: 0.45, hubHalfH: 0.18, hubCy: 0.04,
@@ -397,14 +413,15 @@ export class Claw {
 }
 
 export class Sim {
-  constructor({ finishHeight = 8 } = {}) {
+  constructor({ finishHeight = 8, players = 2 } = {}) {
     this.world = new World({ gravity: Vec2(0, -GRAVITY), allowSleep: true });
     this.time = 0;
     this.stepCount = 0;
     this.finishHeight = finishHeight;
     this.finishY = LAYOUT.padTop + finishHeight;
     this.topY = this.finishY + 6.5;
-    this.barLimit = LAYOUT.barHalf - 0.6;
+    this.layout = makeLayout(this.topY, players);
+    this.barLimit = this.layout.halfW - 0.7;
     this.pieces = new Set();
     this.claws = new Map();      // slot -> Claw
     this.platforms = new Map();  // slot -> static body
@@ -416,11 +433,11 @@ export class Sim {
     this.lastCollapse = -99;
 
     const ground = this.world.createBody({ type: 'static' });
-    ground.createFixture({ shape: new Box(LAYOUT.groundHalf, 1, Vec2(0, -1), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+    ground.createFixture({ shape: new Box(this.layout.groundHalf, 1, Vec2(0, -1), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
     ground.setUserData({ kind: 'ground' });
     this.ground = ground;
     const pad = this.world.createBody({ type: 'static' });
-    pad.createFixture({ shape: new Box(LAYOUT.padHalf, LAYOUT.padTop / 2, Vec2(0, LAYOUT.padTop / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC });
+    pad.createFixture({ shape: new Box(this.layout.padHalf, LAYOUT.padTop / 2, Vec2(0, LAYOUT.padTop / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC });
     pad.setUserData({ kind: 'pad' });
     this.pad = pad;
 
@@ -438,7 +455,7 @@ export class Sim {
 
   addPlayer(slot) {
     if (this.claws.has(slot)) return this.claws.get(slot);
-    const L = LAYOUT.slot(slot);
+    const L = this.layout.slot(slot);
     const plat = this.world.createBody({ type: 'static' });
     // a solid step from the ground up (the higher steps, further out, overlap its outer part)
     plat.createFixture({
@@ -513,7 +530,7 @@ export class Sim {
     if (!this.platforms.has(slot)) return null;
     const shape = PIECES[type].shape;
     const e = extentsOf(shape, angle);
-    const L = LAYOUT.slot(slot);
+    const L = this.layout.slot(slot);
     for (const dx of [0, -0.5 * L.side, 0.5 * L.side]) {
       const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.04 - e.y0;
       if (!this.blocked(shape, x, y, angle)) {
@@ -527,7 +544,7 @@ export class Sim {
 
   // is the player's last new piece still waiting on their shelf? (grabbed, or gone from the shelf, frees it)
   shelfBusy(slot) {
-    const L = LAYOUT.slot(slot);
+    const L = this.layout.slot(slot);
     for (const p of this.pieces) {
       if (!p.waiting || p.owner !== slot) continue;
       const pos = p.body.getPosition();
@@ -554,7 +571,7 @@ export class Sim {
     const e = extentsOf(best.shape, next);
     const pos = best.body.getPosition();
     for (const lift of [0.04, 0.4, 0.8, 1.3]) {
-      const y = LAYOUT.slot(slot).top - e.y0 + lift;
+      const y = this.layout.slot(slot).top - e.y0 + lift;
       if (!this.blocked(best.shape, pos.x, y, next, best.body)) {
         best.body.setTransform(Vec2(pos.x, y), next);
         best.body.setLinearVelocity(Vec2(0, 0));
@@ -792,7 +809,7 @@ export class Sim {
     this.measureTower();
     for (const p of [...this.pieces]) {
       const pos = p.body.getPosition();
-      if (pos.y < LAYOUT.killY || Math.abs(pos.x) > LAYOUT.groundHalf + 10) { this.removePiece(p, 'lost'); continue; }
+      if (pos.y < LAYOUT.killY || Math.abs(pos.x) > this.layout.groundHalf + 10) { this.removePiece(p, 'lost'); continue; }
       // a released piece that settles into the tower "locks" in (stats, the clunk)
       if (!p.locked && p.releasedAt >= 0 && !p.heldBy.size) {
         const age = this.time - p.releasedAt;

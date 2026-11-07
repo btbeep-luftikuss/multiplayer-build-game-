@@ -307,7 +307,7 @@ export class Renderer {
   buildWorld(sim) {
     if (this.world) { this.scene.remove(this.world); this.world.traverse((o) => o.geometry && !o.userData.shared && o.geometry.dispose()); }
     const w = this.world = new THREE.Group();
-    const gh = LAYOUT.groundHalf;
+    const gh = sim.layout.groundHalf;
     // ground: a grassy slab with a dirt front
     const ground = new THREE.Mesh(new THREE.BoxGeometry(gh * 2, 3, 9), [
       this.toon('#9a6942'), this.toon('#9a6942'), this.toon('#ffffff', { map: TX.grassTexture() }), this.toon('#9a6942'),
@@ -317,7 +317,7 @@ export class Renderer {
     ground.receiveShadow = true;
     w.add(ground);
     // the build pad
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.padHalf * 2, LAYOUT.padTop, 2.2), [
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(sim.layout.padHalf * 2, LAYOUT.padTop, 2.2), [
       this.toon('#ffffff', { map: TX.stripesTexture() }), this.toon('#ffffff', { map: TX.stripesTexture() }),
       this.toon('#ffffff', { map: TX.concreteTexture() }), this.toon('#bdb6aa'),
       this.toon('#ffffff', { map: TX.signTexture('BUILD HERE       ·       BUILD HERE       ·       BUILD HERE', '#ffc21a', '#2a2a2a', 2048, 26) }), this.toon('#bdb6aa'),
@@ -328,27 +328,27 @@ export class Renderer {
     // the top bar (a gantry): a striped beam held up by two towers at the ends
     const top = sim.topY;
     const barMat = this.toon('#ffffff', { map: TX.stripesTexture('#ff9f1c', '#3a3a48', 8) });
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.barHalf * 2 + 2, 0.36, 0.7), barMat);
-    bar.material.map.repeat.set(LAYOUT.barHalf * 2 / 4, 1);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(sim.layout.barHalf * 2 + 2, 0.36, 0.7), barMat);
+    bar.material.map.repeat.set(sim.layout.barHalf * 2 / 4, 1);
     bar.position.set(0, top + 0.18, 0);
     bar.castShadow = true;
     w.add(bar);
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.barHalf * 2 + 2, 0.08, 0.9), this.toon('#5b5b6e'));
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(sim.layout.barHalf * 2 + 2, 0.08, 0.9), this.toon('#5b5b6e'));
     rail.position.set(0, top + 0.02, 0);
     w.add(rail);
     for (const sx of [-1, 1]) {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.7, top + 0.6, 0.7), this.toon('#ff9f1c'));
-      post.position.set(sx * (LAYOUT.barHalf + 1.3), (top + 0.6) / 2, -0.3);
+      post.position.set(sx * (sim.layout.barHalf + 1.3), (top + 0.6) / 2, -0.3);
       post.castShadow = true;
       w.add(post);
       const brace = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 0.4), this.toon('#ff9f1c'));
-      brace.position.set(sx * (LAYOUT.barHalf + 0.4), top - 0.6, -0.3);
+      brace.position.set(sx * (sim.layout.barHalf + 0.4), top - 0.6, -0.3);
       brace.rotation.z = sx * 0.6;
       w.add(brace);
     }
     // the finish line: a checkered band behind the build and a glowing sheet across it
     const fy = sim.finishY;
-    const fw = LAYOUT.groundHalf * 2;
+    const fw = sim.layout.groundHalf * 2;
     const dots = TX.dotsTexture();
     dots.repeat.set(fw / 0.6, 1);
     this.finishBand = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.3), new THREE.MeshBasicMaterial({ map: dots, transparent: true, depthWrite: false }));
@@ -370,7 +370,7 @@ export class Renderer {
       const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.55), new THREE.MeshBasicMaterial({ map: TX.checkerTexture(), side: THREE.DoubleSide }));
       cloth.position.set(sx * 0.45, 1.3, 0);
       flag.add(pole, cloth);
-      flag.position.set(sx * (LAYOUT.padHalf + 0.9), fy - 0.8, -1.1);
+      flag.position.set(sx * (sim.layout.padHalf + 0.9), fy - 0.8, -1.1);
       w.add(flag);
       this.finishFlags.push(cloth);
     }
@@ -469,7 +469,7 @@ export class Renderer {
   makePlatformView(slot, player) {
     const group = new THREE.Group();
     const color = player?.color || '#999999';
-    const L = LAYOUT.slot(slot);
+    const L = this.sim.layout.slot(slot);
     const hasHigher = this.sim.platforms.has(slot + 2);
     const w = hasHigher ? 1.8 : LAYOUT.shelfW;
     const xc = L.x0 + L.side * w / 2;
@@ -906,18 +906,19 @@ export class Renderer {
   // keep every claw, every platform in use and the whole tower in view, from the top bar to the ground
   updateCamera(dt, game) {
     const sim = this.sim;
-    let x0 = -LAYOUT.padHalf - 1.5, x1 = LAYOUT.padHalf + 1.5;
-    for (const slot of sim.platforms.keys()) { const L = LAYOUT.slot(slot); x0 = Math.min(x0, L.x0 - 1, L.x1 - 1); x1 = Math.max(x1, L.x0 + 1, L.x1 + 1); }
+    // the whole field, edge to edge (and anything that strays outside it)
+    let x0 = -sim.layout.halfW, x1 = sim.layout.halfW;
+    for (const slot of sim.platforms.keys()) { const L = sim.layout.slot(slot); x0 = Math.min(x0, L.x0 - 0.3, L.x1 - 0.3); x1 = Math.max(x1, L.x0 + 0.3, L.x1 + 0.3); }
     for (const c of sim.claws.values()) {
       const hx = c.body.getPosition().x;
       x0 = Math.min(x0, c.x - 1.6, hx - 1.6); x1 = Math.max(x1, c.x + 1.6, hx + 1.6);
     }
-    for (const p of sim.tower.set) { const x = p.body.getPosition().x; x0 = Math.min(x0, x - 2); x1 = Math.max(x1, x + 2); }
-    const y0 = -1.2, y1 = sim.topY + 1.0;
-    // room for the timer at the top and the height meter at the side
-    let w = (x1 - x0) * 1.16, h = (y1 - y0) * 1.16;
-    // a little extra on the right, where the height meter is
-    let cx = (x0 + x1) / 2 + w * 0.035, cy = (y0 + y1) / 2 + 0.4;
+    for (const p of sim.tower.set) { const x = p.body.getPosition().x; x0 = Math.min(x0, x - 1); x1 = Math.max(x1, x + 1); }
+    // from just below the grass to just above the top bar, filling the screen
+    const y0 = LAYOUT.frameBottom, y1 = sim.topY + LAYOUT.frameTop;
+    const share = LAYOUT.aspect / (16 / 9); // the rest of the width is the height meter's
+    let w = (x1 - x0) / share, h = y1 - y0;
+    let cx = (x0 + x1) / 2 + w * (1 - share) / 2, cy = (y0 + y1) / 2;
     if (game.phase === 'judge' && sim.tower.count) {
       // time's up: lean in on the tower
       const k = clamp(game.phaseT / 1.2, 0, 1) * 0.35;
