@@ -157,6 +157,40 @@ console.log('Levels: progress');
   ok(Object.keys(mix.mods).length >= 2 && mix.height > 10, `a remix mixes mechanics (${Object.keys(mix.mods).join(', ')}) and gets harder`);
 }
 
+console.log('Soft and rocking bases: no false collapses');
+for (const id of [3]) {
+  const g = new Game({ progress: { unlocked: 4 } });
+  g.addPlayer('a', 'A'); g.addPlayer('b', 'B');
+  g.setLevel(id); g.startRound(); run(g, 3.1);
+  const s = g.sim;
+  s.createPiece('stone-slab', 0, 0, s.padTop + 0.4, 0);
+  for (let i = 0; i < 10; i++) s.createPiece('wood-cube', 0, 0, s.padTop + 1.3 + i, 0);
+  let false0 = 0, collapses = 0, fails = 0, k = 0;
+  run(g, 16, () => {
+    // jolt the jelly: pieces dropped on it now and then, away from the tower
+    if (++k % 90 === 0 && s.pieces.size < 30) s.createPiece('stone-cube', 0, (k % 180 ? -5 : 5), s.padTop + 2.5, 0);
+    for (const e of g.drainEvents()) { if (e.type === 'collapse') collapses++; if (e.type === 'holdfail') fails++; if (e.type === 'uncrossed') false0++; }
+    if (g.phase === 'result') return false;
+  });
+  ok(collapses === 0 && false0 === 0 && fails === 0, `Level ${id}: a standing tower never "collapses" or drops below the line (collapse ${collapses}, below ${false0}, hold fails ${fails})`);
+  ok(g.phase === 'result' && g.result.success, `Level ${id}: the hold check passes and the level is won`);
+}
+{
+  // the rocking base: a squat tower that really does stay up is never reported as fallen
+  const g = new Game({ progress: { unlocked: 4 } });
+  g.addPlayer('a', 'A');
+  g.setLevel(4); g.startRound(); run(g, 3.1);
+  const s = g.sim;
+  s.createPiece('stone-slab', 0, 0, s.padTop + 0.4, 0);
+  s.createPiece('stone-slab', 0, 0, s.padTop + 1.2, 0);
+  s.createPiece('stone-cube', 0, 0, s.padTop + 2.1, 0);
+  run(g, 2);
+  const h0 = s.tower.height;
+  let low = h0, collapses = 0;
+  run(g, 25, () => { low = Math.min(low, s.tower.height); for (const e of g.drainEvents()) if (e.type === 'collapse') collapses++; });
+  ok(collapses === 0 && low > h0 - 0.3, `Level 4: a squat tower on the rocking base is measured steadily (${h0.toFixed(2)} m, never below ${low.toFixed(2)} m)`);
+}
+
 console.log('Levels: moving line has no early win');
 {
   const g = new Game({ progress: { unlocked: 8 } });

@@ -509,7 +509,7 @@ export class Sim {
       for (let i = 0; i < n; i++) {
         const x = -half + w * (i + 0.5);
         const seg = this.world.createBody({ type: 'dynamic', position: Vec2(x, top - 0.2), fixedRotation: true, linearDamping: 0.5 });
-        seg.createFixture({ shape: new Box(w / 2 - 0.02, 0.2), density: 1, friction: 0.95, restitution: 0.35, filterCategoryBits: CAT.PAD, filterMaskBits: CAT.PIECE | CAT.CLAW });
+        seg.createFixture({ shape: new Box(w / 2 - 0.02, 0.2), density: 1, friction: 0.95, restitution: 0, filterCategoryBits: CAT.PAD, filterMaskBits: CAT.PIECE | CAT.CLAW });
         seg.setSleepingAllowed(false);
         this.world.createJoint(new PrismaticJoint({ enableLimit: true, lowerTranslation: -this.softTravel, upperTranslation: 0.05 }, this.ground, seg, Vec2(x, top - 0.2), Vec2(0, 1)));
         add(seg, w / 2 - 0.02, 0.2, 'soft').__rest = top - 0.2;
@@ -856,6 +856,12 @@ export class Sim {
         if (ok(p) && !set.has(p)) { set.add(p); queue.push(p); }
       }
     }
+    // a piece that was in the tower a moment ago and is still sitting there (a springy or rocking base
+    // can lift it off for an instant) still counts: the tower hasn't fallen because a contact flickered
+    const graced = new Set();
+    for (const p of this.tower.set) {
+      if (!set.has(p) && ok(p) && this.time - (p.inTowerAt ?? -9) < 0.5 && p.body.getLinearVelocity().length() < 0.6) { set.add(p); queue.push(p); graced.add(p); }
+    }
     while (queue.length) {
       const p = queue.pop();
       for (let ce = p.body.getContactList(); ce; ce = ce.next) {
@@ -866,6 +872,7 @@ export class Sim {
       for (const w of p.welds) if (ok(w.other) && !set.has(w.other)) { set.add(w.other); queue.push(w.other); }
     }
     let top = null, topY = this.padTop, sx = 0;
+    for (const p of set) if (!graced.has(p)) p.inTowerAt = this.time; // (the grace runs out half a second after a real contact)
     for (const p of set) {
       const t = p.top;
       sx += p.body.getWorldCenter().x;
@@ -929,7 +936,7 @@ export class Sim {
       for (const pb of this.padBodies) {
         const b = pb.body;
         const y = b.getPosition().y, vy = b.getLinearVelocity().y;
-        b.applyForceToCenter(Vec2(0, b.getMass() * GRAVITY + 140 * (b.__rest - y) - 28 * vy), true);
+        b.applyForceToCenter(Vec2(0, b.getMass() * GRAVITY + 140 * (b.__rest - y) - 45 * vy), true);
       }
     }
     // wind: gusts that come and go and change direction, stronger higher up
