@@ -32,6 +32,10 @@ Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play*
 
 Beating Level 10 opens the **Endless Remix**: a random mix of two or three of those mechanics, a little harder after every win. A new **Super Claw** power-up can turn up in any game: tap it on your phone and for 20 seconds your claw is faster, quicker on the rope, and grips harder without slipping.
 
+### Playing from a computer
+
+A computer can be a controller too. In the TV lobby, **💻 Use this computer as a controller too** opens a controller in a new tab (the TV keeps running in the first one); the TV's ☰ menu can also switch the screen over to a controller. Any computer can open the game's address with `?join=CODE`, or with `?phone` to type the code in. On a computer: arrow keys or WASD move the claw and the rope, Space grabs, X drops, Q/E turn, and 1–9 take a piece (the mouse works on the pad and buttons too).
+
 ### Phone controls
 
 | Control | What it does |

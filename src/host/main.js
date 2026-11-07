@@ -55,6 +55,9 @@ const hud = new Hud(document.getElementById('ui'), {
       store.set('quality', quality);
       location.reload();
     } else if (act === 'fullscreen') toggleFullscreen();
+    // a computer can be a controller too: in a new tab (this one stays the TV), or instead of the TV
+    else if (act === 'controller') window.open(joinUrl(code), '_blank');
+    else if (act === 'become') { if (confirm('Switch this screen to a controller? The game on this screen will end.')) location.href = joinUrl(code); }
     updateMenuLabels();
     void btn;
   },

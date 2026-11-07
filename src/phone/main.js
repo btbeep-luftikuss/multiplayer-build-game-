@@ -33,6 +33,7 @@ document.body.innerHTML = `
   <button id="go" class="big">Join the game</button>
   <p class="err" id="join-err"></p>
   <a class="host-link" href="?tv">Host the game on this screen instead</a>
+  <p class="keys-hint">On a computer: arrow keys or WASD move the claw and rope, Space grabs, X drops, Q/E turn, 1–9 take a piece.</p>
 </div>
 <div id="pad" class="screen">
   <header>
@@ -345,7 +346,7 @@ function renderOverlay() {
       `<label class="rename">Name <input maxlength="12" value="${esc(me?.name || '')}"><button data-act="rename">Save</button></label>` +
       (st?.ld && (st.ph === 'play' || st.ph === 'countdown' || st.ph === 'hold') ? `<button data-act="restart">Restart the round</button>` : '') +
       `<button data-act="fullscreen">Full screen</button><button data-act="code">Leave the game</button><button class="big" data-act="close">Back</button>` +
-      `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). On the big pad, drag left and right to slide your claw along the bar, up and down to raise and lower it (diagonally does both). GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn the piece waiting on your shelf (pieces can't be turned once they're in the claw). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
+      `<div class="help"><b>How to play</b><br>On a computer: arrow keys or WASD move the claw and the rope, Space grabs, X drops, Q/E turn, 1–9 take a piece.<br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). On the big pad, drag left and right to slide your claw along the bar, up and down to raise and lower it (diagonally does both). GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn the piece waiting on your shelf (pieces can't be turned once they're in the claw). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
   }
   o.innerHTML = html;
   o.classList.toggle('show', !!html);
@@ -395,6 +396,38 @@ async function keepAwake() {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && link) keepAwake(); });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---------- on a computer: the keyboard works too ----------
+// arrows or WASD move the claw and the rope, Space grabs, X drops, Q/E turn, 1–9 take a piece
+const keysDown = new Set();
+function keyInput() {
+  const k = (a, b) => keysDown.has(a) || keysDown.has(b);
+  input.mx = (k('arrowright', 'd') ? 1 : 0) - (k('arrowleft', 'a') ? 1 : 0);
+  input.ry = (k('arrowup', 'w') ? 1 : 0) - (k('arrowdown', 's') ? 1 : 0);
+  pushInput(true);
+}
+addEventListener('keydown', (e) => {
+  if (!link || e.target.closest?.('input') || e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'a', 'd', 'w', 's'].includes(key)) {
+    e.preventDefault();
+    if (!keysDown.has(key)) { keysDown.add(key); keyInput(); }
+    return;
+  }
+  if (e.repeat) return;
+  if (key === ' ') { e.preventDefault(); send({ t: 'grab' }); }
+  else if (key === 'x') send({ t: 'drop' });
+  else if (key === 'q') send({ t: 'rot', d: 1 });
+  else if (key === 'e') send({ t: 'rot', d: -1 });
+  else if (/^[1-9]$/.test(key)) document.querySelectorAll('#pad .cards .card')[Number(key) - 1]?.click();
+});
+addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  if (keysDown.delete(key)) keyInput();
+  if (key === 'q' || key === 'e') send({ t: 'rotEnd' });
+});
+addEventListener('blur', () => { if (keysDown.size) { keysDown.clear(); keyInput(); } });
+if (matchMedia('(pointer: fine)').matches) document.body.classList.add('has-keys');
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
 show('join');

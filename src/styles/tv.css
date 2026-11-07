@@ -162,6 +162,7 @@ body.tv { cursor: default; user-select: none; -webkit-user-select: none; }
 #lobby .setting button { font-size: 1.8vh; padding: 0.2vh 1.1vh; box-shadow: 0 0.3vh 0 var(--ink); border-width: 0.3vh; }
 #lobby .setting button.sel { background: var(--ink); color: #fff; }
 #lobby .start { display: block; width: 100%; margin-top: 1.4vh; }
+#lobby .as-controller { display: block; width: 100%; margin-top: 0.8vh; font-size: 1.8vh; padding: 0.3vh 1vh; box-shadow: 0 0.3vh 0 var(--ink); }
 #lobby .hint { margin: 0.8vh 0 0; font-size: 1.7vh; line-height: 1.3; }
 
 #results { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(70vw, 110vh); padding: 3vh 4vh; text-align: center; }

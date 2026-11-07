@@ -85,6 +85,7 @@ export class Hud {
           <div class="settings"></div>
         </div>
         <button class="start big">Start the round</button>
+        <button class="as-controller">💻 Use this computer as a controller too</button>
         <p class="hint small">Press Enter, or the first player taps <b>Start</b> on their phone. Warm up with your claw while you wait!</p>
       </div>
       <div id="results" class="panel">
@@ -105,6 +106,8 @@ export class Hud {
         <button data-act="music">Music: on</button>
         <button data-act="quality">Graphics: high</button>
         <button data-act="fullscreen">Full screen</button>
+        <button data-act="controller">Open a controller on this computer</button>
+        <button data-act="become">Switch this screen to a controller</button>
         <button data-act="close" class="big">Back to the game</button>
       </div>
       <div id="sound-hint">🔊 Click anywhere to turn on the sound</div>`;
@@ -113,6 +116,7 @@ export class Hud {
     this.results = $('#results', root);
     this.menu = $('#menu', root);
     $('.start', this.lobby).onclick = () => actions.start();
+    $('.as-controller', this.lobby).onclick = () => actions.menu('controller');
     for (const b of this.lobby.querySelectorAll('.tabs button')) b.onclick = () => actions.mode(b.dataset.mode);
     $('#menu-btn', root).onclick = () => this.toggleMenu();
     this.menu.addEventListener('click', (ev) => {

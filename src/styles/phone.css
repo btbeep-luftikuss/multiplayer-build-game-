@@ -24,6 +24,8 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #join input { font-family: var(--font); font-size: 26px; font-weight: 800; padding: 8px 14px; border-radius: 14px; border: 3px solid #000; background: var(--paper); color: var(--ink); text-align: center; letter-spacing: 2px; }
 #join #code { font-size: 38px; letter-spacing: 10px; text-transform: uppercase; }
 #join .err { color: #ff8c97; min-height: 1.2em; margin: 0; text-align: center; font-weight: 700; }
+.keys-hint { display: none; text-align: center; font-size: 14px; opacity: 0.75; margin: 0; }
+body.has-keys .keys-hint { display: block; }
 #join .host-link { color: #b6a8e6; text-align: center; font-size: 14px; }
 
 /* ---------- the controller ---------- */
@@ -162,3 +164,9 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #count.hold { flex-direction: column; color: #5dff8a; background: rgba(30, 21, 51, 0.6); }
 #count small { font-size: 9vmin; -webkit-text-stroke: 2px #000; color: #fff; }
 @keyframes boing { from { transform: scale(0.3); } to { transform: scale(1); } }
+
+/* on a computer screen: keep the controller a comfortable width, in the middle */
+@media (min-width: 760px) and (min-height: 600px) {
+  #pad.show { left: 50%; right: auto; width: 560px; transform: translateX(-50%); }
+  body.phone { background: #120c22; }
+}
