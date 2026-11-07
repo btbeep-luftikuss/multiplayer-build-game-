@@ -71,6 +71,11 @@ ok(g.phase === 'hold', 'over the line again: another hold');
 run(g, 5.2);
 ok(g.phase === 'result' && g.result.success && g.result.early, `it stands for 5 s: an early win with ${Math.ceil(g.result.timeLeft)} s to spare, ${g.result.stars} star(s)`);
 
+{
+  const used = g.result.used / g.result.roundTime;
+  ok(g.result.stars === (used <= 0.5 ? 3 : used <= 0.75 ? 2 : 1), `stars go by time: ${Math.round(used * 100)}% of the clock used, ${g.result.stars} star(s)`);
+}
+
 console.log('Time up');
 g.startRound();
 run(g, 3.1);

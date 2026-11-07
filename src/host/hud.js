@@ -352,7 +352,7 @@ export class Hud {
     }
     $('.stars', R).innerHTML = res.success ? [1, 2, 3].map((i) => `<span class="${i <= res.stars ? 'on' : ''}">★</span>`).join('') : '';
     $('.numbers', R).innerHTML = (res.early ? `<div class="early">Finished with ${fmtTime(Math.ceil(res.timeLeft))} to spare!</div>` : '') + `Height <b>${res.height.toFixed(1)} m</b> · finish line ${m1(res.finish)} m · ${res.pieces} piece${res.pieces === 1 ? '' : 's'} in the tower` +
-      (res.success ? (res.stars < 3 ? `<div class="small">Next star at ${(res.finish * (res.stars === 1 ? 1.15 : 1.3)).toFixed(1)} m</div>` : '') : `<div class="small">${Math.max(0, res.finish - res.height).toFixed(1)} m short. So close… try again!</div>`);
+      (res.success ? (res.stars < 3 ? `<div class="small">Finish within ${fmtTime(Math.floor(res.roundTime * (res.stars === 1 ? 0.75 : 0.5)))} for ${res.stars + 1} stars</div>` : '<div class="small">Top speed!</div>') : `<div class="small">${Math.max(0, res.finish - res.height).toFixed(1)} m short. So close… try again!</div>`);
     $('.awards', R).innerHTML = res.awards.map((a) => `<div class="award"><span class="title">${esc(a.title)}</span> ${esc(a.name)}</div>`).join('');
     const rows = res.players.sort((a, b) => b.placed - a.placed).map((p) => `<tr><td><span class="dot" style="background:${p.color}"></span>${esc(p.name)}</td><td>${p.placed}</td><td>${p.highest.toFixed(1)} m</td><td>${p.lost}</td></tr>`).join('');
     $('.table', R).innerHTML = `<tr><th></th><th>placed</th><th>highest</th><th>dropped</th></tr>${rows}`;

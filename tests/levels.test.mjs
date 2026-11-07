@@ -134,6 +134,7 @@ console.log('Levels: progress');
   const r = g.result;
   ok(g.phase === 'result' && r.success && r.level.id === 1 && r.unlocked === 2 && r.next === 2, `won: Level 2 unlocked (in ${r?.level?.time} s)`);
   ok(g.progress.levels[1].done && g.progress.levels[1].best === r.level.time, 'the best team time is kept');
+  ok(r.stars === 3, `won in ${r.level.time} s of ${r.roundTime} s: 3 stars for speed`);
   ok(g.drainEvents().some((e) => e.type === 'progress'), 'and announced so the TV saves it');
   ok(g.nextLevel() && g.levelId === 2 && g.sim.mods.wind, 'Next level: Level 2, with wind');
   const g2 = new Game({ progress: { unlocked: 10, levels: Object.fromEntries(LEVELS.map((l) => [l.id, { done: l.id < 10, best: 60 }])) } });

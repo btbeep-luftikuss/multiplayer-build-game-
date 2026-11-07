@@ -14,7 +14,8 @@ export const SETTING_CHOICES = {
 const COUNTDOWN = 3;
 const JUDGE_TIME = 4;
 const OVER_TIME = 3;          // the tower over the line this long starts the hold check…
-const HOLD_TIME = 5;          // …which it has to survive, hands off, to win early
+const HOLD_TIME = 5;
+export const STAR3 = 0.5, STAR2 = 0.75; // share of the round time used, for 3 and 2 stars          // …which it has to survive, hands off, to win early
 const DROP_AFTER = 45;       // a player gone this long loses their claw
 
 // how high the finish line is, above the build pad
@@ -486,7 +487,9 @@ export class Game {
     const height = this.sim.tower.height;
     const finish = this.sim.finishHeight;
     const success = height >= finish;
-    const stars = !success ? 0 : height >= finish * 1.3 ? 3 : height >= finish * 1.15 ? 2 : 1;
+    // stars for speed: 3 for finishing in the first half of the time, 2 within three quarters, 1 otherwise
+    const used = this.elapsed / this.roundTime();
+    const stars = !success ? 0 : used <= STAR3 ? 3 : used <= STAR2 ? 2 : 1;
     this.best = Math.max(this.best, height);
     const players = [...this.players.values()].map((p) => ({ slot: p.slot, name: p.name, color: p.color, ...p.stats }));
     const awards = [];
@@ -500,7 +503,7 @@ export class Game {
       top('grabs', 'Grabby Hands', 3);
       top('lost', 'Butterfingers');
     }
-    this.result = { success, height, finish, stars, best: this.best, pieces: this.sim.tower.count, players, awards, round: this.round, early: early && success, timeLeft: this.timeLeft };
+    this.result = { success, height, finish, stars, roundTime: this.roundTime(), used: this.elapsed, best: this.best, pieces: this.sim.tower.count, players, awards, round: this.round, early: early && success, timeLeft: this.timeLeft };
     if (this.mode === 'levels') this.levelResult(success);
     this.setPhase('result');
     this.emit({ type: 'result', result: this.result });

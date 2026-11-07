@@ -11,7 +11,7 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 - Swing it over to the build pad and **let go**. Pieces stack, slide, tip and topple, all fully simulated.
 - Grab anything, anywhere: your pieces, other people's, even pieces already in the tower. Two claws can lift a heavy base together.
 - Once the tower has been over the finish line for **3 seconds**, a **5-second hold** starts: every claw lets go and pulls up, and the helpers vanish. If the tower is still over the line at the end, **everyone wins** right away. If it falls, the claws come back and you keep building.
-- When the clock hits zero the same check happens one last time. Build higher for 2 and 3 stars.
+- When the clock hits zero the same check happens one last time. Stars are for speed: finish within the first half of the time for 3 stars, within three quarters for 2, and any win gets 1.
 
 ### Levels mode
 
