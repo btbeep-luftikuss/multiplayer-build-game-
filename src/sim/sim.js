@@ -263,6 +263,15 @@ export class Claw {
   postStep(dt) {
     const f = this.rope.getReactionForce(1 / dt);
     this.lastTension = Math.hypot(f.x, f.y);
+    // the bar is in the way: a claw swinging up hard (low gravity, a short rope, a sudden stop) bumps
+    // its underside instead of looping right over the top
+    const ceiling = this.sim.topY + CLAW.ropeOnTrolley - 0.3;
+    const knot = this.body.getWorldPoint(Vec2(0, CLAW.ropeOnClaw));
+    if (knot.y > ceiling) {
+      const p = this.body.getPosition(), v = this.body.getLinearVelocity();
+      this.body.setTransform(Vec2(p.x, p.y - (knot.y - ceiling)), this.body.getAngle());
+      if (v.y > 0) this.body.setLinearVelocity(Vec2(v.x, -0.3 * v.y));
+    }
     if (!this.auto) return;
     const a = this.auto;
     a.t += dt;
@@ -487,8 +496,12 @@ export class Sim {
     this.padBodies = [];
     const add = (body, hw, hh, kind) => { body.setUserData({ kind: 'pad' }); this.padBodies.push({ body, hw, hh, kind }); return body; };
     if (mods.tilt) {
-      const slab = this.world.createBody({ type: 'kinematic', position: Vec2(0, top - 0.2) });
-      slab.createFixture({ shape: new Box(half, 0.2), friction: 0.95, filterCategoryBits: CAT.PAD, filterMaskBits: CAT.PIECE | CAT.CLAW });
+      // a slab on a motorised hinge: strong enough to rock any tower, but (unlike something moved by
+      // force of will) it stalls rather than crushing whatever gets caught under its end
+      const slab = this.world.createBody({ type: 'dynamic', position: Vec2(0, top - 0.2), angularDamping: 0.5 });
+      slab.createFixture({ shape: new Box(half, 0.2), density: 2, friction: 0.95, filterCategoryBits: CAT.PAD, filterMaskBits: CAT.PIECE | CAT.CLAW });
+      slab.setSleepingAllowed(false);
+      this.hinge = this.world.createJoint(new RevoluteJoint({ enableMotor: true, maxMotorTorque: 6000, motorSpeed: 0 }, this.ground, slab, Vec2(0, top - 0.2)));
       add(slab, half, 0.2, 'tilt');
       // a solid base under the pivot, below the slab's reach
       const base = this.world.createBody({ type: 'static' });
@@ -550,6 +563,7 @@ export class Sim {
   removePlayer(slot) {
     const claw = this.claws.get(slot);
     if (claw) { claw.destroy(); this.claws.delete(slot); }
+    for (const p of this.pieces) if (p.parked && p.owner === slot) this.unpark(p);
     const plat = this.platforms.get(slot);
     if (plat) {
       this.world.destroyBody(plat);
@@ -906,6 +920,13 @@ export class Sim {
     this.stepMods(dt);
     this.stepSpecials();
     this.world.step(dt, 10, 6);
+    // a safety net: nothing flies faster than this (a piece or claw squeezed somewhere it can't be
+    // would otherwise be shot out)
+    for (let b = this.world.getBodyList(); b; b = b.getNext()) {
+      if (!b.isDynamic()) continue;
+      const v = b.getLinearVelocity(), sp = v.length();
+      if (sp > 22) b.setLinearVelocity(Vec2(v.x * 22 / sp, v.y * 22 / sp));
+    }
     const q = this.queue; this.queue = [];
     for (const fn of q) fn();
     for (const claw of this.claws.values()) claw.postStep(dt);
@@ -925,10 +946,10 @@ export class Sim {
     // the base rocking from side to side
     if (m.tilt) {
       const A = (m.tilt.amp * Math.PI) / 180;
-      const want = A * Math.sin((2 * Math.PI * (t + dt)) / m.tilt.period);
+      const w = (2 * Math.PI) / m.tilt.period;
+      const want = A * Math.sin(w * (t + dt)), wantSpeed = A * w * Math.cos(w * (t + dt));
       const slab = this.padBodies[0].body;
-      slab.setLinearVelocity(Vec2(0, 0));
-      slab.setAngularVelocity((want - slab.getAngle()) / dt);
+      this.hinge.setMotorSpeed(clamp(wantSpeed + 6 * (want - slab.getAngle()), -0.6, 0.6));
       this.tilt = slab.getAngle();
     }
     // jelly: each segment of the base sits on its own spring (a heavy base sinks it about 0.2 m)

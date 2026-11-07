@@ -392,7 +392,8 @@ export class Game {
     }
     if (this.phase !== 'play') return;
     const h = this.sim.tower.height;
-    if (!this.crossed && h >= this.sim.finishHeight) { this.crossed = true; this.emit({ type: 'crossed', height: h }); }
+    // (when the finish line drifts, the tower crossing it back and forth isn't news)
+    if (this.sim.lineAmp) { /* nothing */ } else if (!this.crossed && h >= this.sim.finishHeight) { this.crossed = true; this.emit({ type: 'crossed', height: h }); }
     else if (this.crossed && h < this.sim.finishHeight - 0.5) { this.crossed = false; this.emit({ type: 'uncrossed', height: h }); }
     // power-ups now and then
     if (this.powerupsOn() && this.elapsed >= this.nextPower && this.timeLeft > 15) {

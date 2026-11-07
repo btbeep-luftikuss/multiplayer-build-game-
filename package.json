@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
-    "test": "node tests/physics.test.mjs && node tests/game.test.mjs && node tests/levels.test.mjs && node tests/chaos.test.mjs"
+    "test": "node tests/physics.test.mjs && node tests/game.test.mjs && node tests/levels.test.mjs && node tests/chaos.test.mjs && node tests/chaos-levels.test.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

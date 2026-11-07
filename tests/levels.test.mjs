@@ -42,6 +42,22 @@ console.log('Rocking base');
   ok(Math.abs(cube.body.getAngle() - sim.tilt) < 0.03 && sim.tower.set.has(cube), 'and a cube rides on it');
 }
 
+console.log('Rocking base: nothing caught under it gets launched');
+{
+  const sim = new Sim({ finishHeight: 9, players: 2, mods: { tilt: { amp: 6, period: 8 } } });
+  const claw = sim.addPlayer(0);
+  run(sim, 0.5);
+  // steer the claw under the slab's left end, all the way down, and leave it there while it rocks
+  claw.input.mx = 1;
+  run(sim, 6, () => { if (claw.x > -sim.layout.padHalf + 1.5) claw.input.mx = 0; });
+  claw.input.ry = -1;
+  let top = -99, fast = 0;
+  const cube = sim.createPiece('wood-cube', 0, sim.layout.padHalf - 1.5, 0.6, 0); // and a cube under the other end
+  run(sim, 40, () => { const p = claw.body.getPosition(); top = Math.max(top, p.y, cube.body.getPosition().y); fast = Math.max(fast, claw.body.getLinearVelocity().length(), cube.body.getLinearVelocity().length()); });
+  console.log(`   highest point ${top.toFixed(1)} m (bar at ${sim.topY.toFixed(1)}), fastest ${fast.toFixed(1)} m/s`);
+  ok(top < sim.topY && fast < 15, 'a claw and a cube under the slab are pushed aside, not shot out');
+}
+
 console.log('Magnetic blocks');
 {
   const sim = new Sim({ finishHeight: 5, mods: { magnets: true } });
