@@ -182,16 +182,33 @@ console.log('An off-centre grab on a heavy girder slips; a centred one holds');
   }
 }
 
-console.log('Turntable: rotate a piece sitting on the platform');
+console.log('Turntable: pieces turn on the shelf without falling over');
 {
   const sim = new Sim({ finishHeight: 8 });
-  sim.addPlayer(0);
+  const claw = sim.addPlayer(0);
   run(sim, 0.5);
-  const p = sim.spawnOnPlatform(0, 'wood-beam', 0);
-  run(sim, 1.5);
-  ok(sim.turnPlatformPiece(0, 1) && sim.turnPlatformPiece(0, 1), 'the beam turns twice');
-  run(sim, 2);
-  ok(Math.abs(Math.abs(p.body.getAngle()) - Math.PI / 2) < 0.08 || Math.abs(p.body.getPosition().y - sim.layout.slot(0).top) < 3, `it stands on end or lies on the platform (angle ${(p.body.getAngle() * 180 / Math.PI).toFixed(0)}°)`);
+  const top = sim.layout.slot(0).top;
+  for (const [type, turns] of [['wood-cube', 1], ['wood-short', 1], ['wood-post', 1], ['wood-wedge', 3], ['wood-short', 2]]) {
+    const p = sim.spawnOnPlatform(0, type, 0);
+    run(sim, 0.5);
+    for (let i = 0; i < turns; i++) sim.turnPlatformPiece(0, 1);
+    run(sim, 3);
+    const want = turns * Math.PI / 4;
+    console.log(`   ${type} turned ${turns * 45}°: now at ${(p.body.getAngle() * 180 / Math.PI).toFixed(0)}°, bottom ${(p.body.getPosition().y + 0).toFixed(2)}`);
+    ok(Math.abs(p.body.getAngle() - want) < 0.02, `a ${type} stays at ${turns * 45}° on the turntable`);
+    ok(sim.shelfBusy(0), 'and keeps the shelf busy');
+    sim.removePiece(p, 'test');
+  }
+  ok(!sim.shelfBusy(0) && sim.turnPlatformPiece(0, 1) === 'empty', 'an empty shelf has nothing to turn');
+  const p = sim.spawnOnPlatform(0, 'wood-cube', 0);
+  sim.turnPlatformPiece(0, 1);
+  run(sim, 0.5);
+  claw.drop();
+  run(sim, 8, () => (claw.state === 'holding' && !claw.auto ? false : undefined));
+  ok(claw.hold?.piece === p && !p.parked && p.body.isDynamic(), 'DROP grabs the turned cube off the turntable');
+  ok(!sim.shelfBusy(0), 'which frees the shelf');
+  ok(Math.abs(p.body.getAngle() - Math.PI / 4) < 0.1, 'and the claw keeps it at 45°');
+  void top;
 }
 
 console.log('Sticky goo glues');

@@ -297,7 +297,7 @@ export class Claw {
         const p = this.body.getWorldPoint(Vec2(J.cx + (i / 4 * 2 - 1) * J.hw * 0.9, J.cy + (j / 3 * 2 - 1) * J.hh * 0.95));
         this.sim.world.queryAABB(new AABB(Vec2(p.x - 0.01, p.y - 0.01), Vec2(p.x + 0.01, p.y + 0.01)), (fx) => {
           const ud = fx.getBody().getUserData();
-          if (ud?.kind === 'piece' && !ud.piece.dead && fx.getBody().isDynamic() && fx.testPoint(p)) {
+          if (ud?.kind === 'piece' && !ud.piece.dead && !fx.getBody().isStatic() && fx.testPoint(p)) {
             hits.set(ud.piece, (hits.get(ud.piece) || 0) + 1);
           }
           return true;
@@ -328,6 +328,7 @@ export class Claw {
 
   attach(piece, assist) {
     this.setFist(false);
+    this.sim.unpark(piece);
     const anchor = this.body.getWorldPoint(Vec2(CLAW.jaw.cx, CLAW.jaw.cy));
     const joint = this.sim.world.createJoint(new RevoluteJoint({
       enableMotor: true, maxMotorTorque: CLAW.gripTorque, motorSpeed: 0, collideConnected: false,
@@ -534,56 +535,56 @@ export class Sim {
     const e = extentsOf(shape, angle);
     const L = this.layout.slot(slot);
     for (const dx of [0, -0.5 * L.side, 0.5 * L.side]) {
-      const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.04 - e.y0;
+      const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.025 - e.y0;
       if (!this.blocked(shape, x, y, angle)) {
         const p = this.createPiece(type, slot, x, y, angle);
-        p.waiting = true;
+        this.park(p);
         return p;
       }
     }
     return null;
   }
 
-  // is the player's last new piece still waiting on their shelf? (grabbed, or gone from the shelf, frees it)
-  shelfBusy(slot) {
-    const L = this.layout.slot(slot);
-    for (const p of this.pieces) {
-      if (!p.waiting || p.owner !== slot) continue;
-      const pos = p.body.getPosition();
-      if (p.dead || p.heldBy.size || Math.abs(pos.x - L.x) > 2.6 || pos.y < L.top - 0.5 || pos.y > L.top + 4) p.waiting = false;
-      else return true;
-    }
-    return false;
+  // A new piece waits on its shelf's turntable, held still at whatever angle it's turned to (so a cube
+  // turned onto its corner doesn't topple). It becomes an ordinary piece once a claw grabs it.
+  park(p) {
+    p.parked = true;
+    p.body.setKinematic();
+    p.body.setLinearVelocity(Vec2(0, 0));
+    p.body.setAngularVelocity(0);
   }
 
-  // spin the newest loose piece sitting on a player's platform (the platform is a turntable)
+  unpark(p) {
+    if (!p.parked) return;
+    p.parked = false;
+    p.body.setDynamic();
+    p.body.setAwake(true);
+  }
+
+  parkedPiece(slot) {
+    for (const p of this.pieces) if (p.parked && !p.dead && p.owner === slot) return p;
+    return null;
+  }
+
+  // is the player's last new piece still waiting on their shelf?
+  shelfBusy(slot) { return !!this.parkedPiece(slot); }
+
+  // turn the piece waiting on a player's shelf one step (the shelf is a turntable).
+  // 'turned', or why not: 'empty' (nothing waiting) or 'blocked' (no room to turn it there)
   turnPlatformPiece(slot, dir) {
-    const plat = this.platforms.get(slot);
-    if (!plat) return false;
-    let best = null;
-    for (const p of this.pieces) {
-      if (p.owner !== slot || p.heldBy.size || p.dead || !p.body.isDynamic()) continue;
-      let onPlat = false;
-      for (let ce = p.body.getContactList(); ce; ce = ce.next) if (ce.other === plat && ce.contact.isTouching()) onPlat = true;
-      if (onPlat && (!best || p.bornAt > best.bornAt)) best = p;
-    }
-    if (!best) return false;
-    const a = best.body.getAngle();
+    const p = this.parkedPiece(slot);
+    if (!p) return 'empty';
+    const a = p.body.getAngle();
     const next = dir > 0 ? (Math.floor(a / ROT_STEP + 0.02) + 1) * ROT_STEP : (Math.ceil(a / ROT_STEP - 0.02) - 1) * ROT_STEP;
-    const e = extentsOf(best.shape, next);
-    const pos = best.body.getPosition();
-    for (const lift of [0.04, 0.4, 0.8, 1.3]) {
-      const y = this.layout.slot(slot).top - e.y0 + lift;
-      if (!this.blocked(best.shape, pos.x, y, next, best.body)) {
-        best.body.setTransform(Vec2(pos.x, y), next);
-        best.body.setLinearVelocity(Vec2(0, 0));
-        best.body.setAngularVelocity(0);
-        best.body.setAwake(true);
-        this.emit({ type: 'turn', piece: best.id, slot });
-        return true;
-      }
-    }
-    return false;
+    const e = extentsOf(p.shape, next), e0 = extentsOf(p.shape, a);
+    const pos = p.body.getPosition();
+    // keep the middle of the piece where it was, sitting on the shelf
+    const cx = pos.x + (e0.x0 + e0.x1) / 2;
+    const x = cx - (e.x0 + e.x1) / 2, y = this.layout.slot(slot).top + 0.025 - e.y0;
+    if (this.blocked(p.shape, x, y, next, p.body)) return 'blocked';
+    p.body.setTransform(Vec2(x, y), next);
+    this.emit({ type: 'turn', piece: p.id, slot });
+    return 'turned';
   }
 
   removePiece(piece, reason) {
@@ -708,7 +709,7 @@ export class Sim {
   removeAids() {
     for (const claw of this.claws.values()) { claw.auto = null; if (claw.state !== 'open') claw.release(); }
     for (const p of [...this.pieces]) {
-      if (p.special === 'support' || p.special === 'balloon') this.removePiece(p, 'aid');
+      if ((p.special === 'support' || p.special === 'balloon') && p.armed) this.removePiece(p, 'aid');
     }
   }
 

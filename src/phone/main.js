@@ -323,7 +323,7 @@ function renderOverlay() {
   } else if (menuOpen) {
     html = `<h2>Menu</h2><p>You are <b style="color:var(--me)">${esc(me?.name || '')}</b> (${esc(me?.colorName || '')} claw)</p>` +
       `<label class="rename">Name <input maxlength="12" value="${esc(me?.name || '')}"><button data-act="rename">Save</button></label>` +
-      (st?.ld && (st.ph === 'play' || st.ph === 'countdown') ? `<button data-act="restart">Restart the round</button>` : '') +
+      (st?.ld && (st.ph === 'play' || st.ph === 'countdown' || st.ph === 'hold') ? `<button data-act="restart">Restart the round</button>` : '') +
       `<button data-act="fullscreen">Full screen</button><button data-act="code">Leave the game</button><button class="big" data-act="close">Back</button>` +
       `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). On the big pad, drag left and right to slide your claw along the bar, up and down to raise and lower it (diagonally does both). GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn the piece waiting on your shelf (pieces can't be turned once they're in the claw). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
   }

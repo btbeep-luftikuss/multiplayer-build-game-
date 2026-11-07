@@ -143,8 +143,9 @@ export class Game {
     dir = dir > 0 ? 1 : -1;
     // pieces only turn on the spawn shelf (its turntable), never in the claw
     if (c.hold) { this.toast(p, 'Turn pieces on your shelf, before you grab them'); return false; }
-    if (this.sim.turnPlatformPiece(p.slot, dir)) return 'platform';
-    this.toast(p, 'Nothing on your shelf to turn');
+    const r = this.sim.turnPlatformPiece(p.slot, dir);
+    if (r === 'turned') return 'platform';
+    this.toast(p, r === 'blocked' ? 'No room to turn it there: move your claw away' : 'Nothing on your shelf to turn');
     return false;
   }
 
@@ -158,7 +159,7 @@ export class Game {
     if (!p || !p.present) return false;
     const item = p.inv[index];
     if (!item || !PIECES[item.id]) return false;
-    if (!this.canSpawn()) { this.toast(p, this.phase === 'countdown' ? 'Wait for GO!' : 'Round over'); return false; }
+    if (!this.canSpawn()) { this.toast(p, this.phase === 'countdown' ? 'Wait for GO!' : this.phase === 'hold' ? 'Hands off: wait and see if it stands!' : 'Round over'); return false; }
     const free = this.phase === 'lobby';
     if (!free && item.n <= 0) { this.toast(p, `No ${PIECES[item.id].name} left`); return false; }
     angle = Number.isFinite(angle) ? Math.round(angle / (Math.PI / 4)) * (Math.PI / 4) : 0;

@@ -124,7 +124,7 @@ function onPhone(cid, m) {
     case 'name': game.rename(cid, m.name); break;
     case 'set': if (leader && game.setSetting(m.key, m.val)) store.set('settings', game.settings); break;
     case 'start': if (leader) startOrRestart(); break;
-    case 'restart': if (leader && (game.phase === 'play' || game.phase === 'countdown')) game.startRound(); break;
+    case 'restart': if (leader && (game.phase === 'play' || game.phase === 'countdown' || game.phase === 'hold')) game.startRound(); break;
     case 'lobby': if (leader && game.phase === 'result') game.toLobby(); break;
     default: break;
   }
