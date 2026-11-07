@@ -20,19 +20,21 @@ export const LAYOUT = {
   frameTop: 1.1,       // …to just above the trolleys on the top bar
 };
 
-// Where everything goes for one round. The field is exactly as wide as a TV screen shows when the
-// top bar is at the top edge and the grass at the bottom. Spawn shelves sit at the far left and right,
-// alternating sides, as solid steps rising like stairs towards the edges; each higher step starts
-// 1.8 m further out, so the step below keeps 1.8 m of open top for its pieces. The build pad takes
-// everything in between.
+// Where everything goes for one round. A wide build pad in the middle (wider with more players), and
+// spawn shelves beyond it at the far left and right, alternating sides, as solid steps rising like
+// stairs towards the edges; each higher step starts 1.8 m further out, so the step below keeps 1.8 m
+// of open top for its pieces. The TV camera zooms out as far as the claws spread.
 export function makeLayout(topY, players) {
-  const levels = Math.max(1, Math.ceil(players / 2));
-  const halfW = Math.max(9, (topY + LAYOUT.frameTop - LAYOUT.frameBottom) * LAYOUT.aspect / 2);
+  const n = Math.max(2, players);
+  const levels = Math.max(1, Math.ceil(n / 2));
   const step = 1.8;
-  const inner0 = halfW - 0.4 - LAYOUT.shelfW - (levels - 1) * step;
+  const padHalf = 11 + n * 0.5;
+  const inner0 = padHalf + 1.4;
+  const halfW = inner0 + (levels - 1) * step + LAYOUT.shelfW + 0.4;
+  void topY;
   return {
     halfW, levels,
-    padHalf: Math.max(3, inner0 - 1.4),
+    padHalf,
     groundHalf: halfW + 3,
     barHalf: halfW + 0.6,
     // x0/x1: the shelf's inner and outer ends; x: where new pieces arrive (the part a claw can reach)

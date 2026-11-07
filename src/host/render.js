@@ -906,31 +906,43 @@ export class Renderer {
   // keep every claw, every platform in use and the whole tower in view, from the top bar to the ground
   updateCamera(dt, game) {
     const sim = this.sim;
-    // the whole field, edge to edge (and anything that strays outside it)
-    let x0 = -sim.layout.halfW, x1 = sim.layout.halfW;
-    for (const slot of sim.platforms.keys()) { const L = sim.layout.slot(slot); x0 = Math.min(x0, L.x0 - 0.3, L.x1 - 0.3); x1 = Math.max(x1, L.x0 + 0.3, L.x1 + 0.3); }
-    for (const c of sim.claws.values()) {
-      const hx = c.body.getPosition().x;
-      x0 = Math.min(x0, c.x - 1.6, hx - 1.6); x1 = Math.max(x1, c.x + 1.6, hx + 1.6);
-    }
-    for (const p of sim.tower.set) { const x = p.body.getPosition().x; x0 = Math.min(x0, x - 1); x1 = Math.max(x1, x + 1); }
-    // from just below the grass to just above the top bar, filling the screen
-    const y0 = LAYOUT.frameBottom, y1 = sim.topY + LAYOUT.frameTop;
+    const L = sim.layout;
+    this.insetNow = lerp(this.insetNow, this.inset, 1 - Math.exp(-dt * 4));
+    const aspect = this.camera.aspect * (1 - this.insetNow);
+    const tan = Math.tan((this.camera.fov * Math.PI / 180) / 2);
     const share = LAYOUT.aspect / (16 / 9); // the rest of the width is the height meter's
-    let w = (x1 - x0) / share, h = y1 - y0;
-    let cx = (x0 + x1) / 2 + w * (1 - share) / 2, cy = (y0 + y1) / 2;
+    // at its closest the view runs from the top bar down to the grass, filling the screen…
+    const y0 = LAYOUT.frameBottom, y1 = sim.topY + LAYOUT.frameTop;
+    let h = y1 - y0;
+    const wMin = h * aspect * share;
+    // …and it zooms out to keep every claw and the whole tower in sight (the whole field in the lobby)
+    let x0 = -6, x1 = 6;
+    if (game.phase === 'lobby') { x0 = -L.halfW; x1 = L.halfW; }
+    for (const c of sim.claws.values()) {
+      const hx = c.body.getPosition().x, r = c.hold ? 2.6 : 1.8;
+      x0 = Math.min(x0, c.x - r, hx - r); x1 = Math.max(x1, c.x + r, hx + r);
+    }
+    for (const p of sim.tower.set) { const x = p.body.getPosition().x; x0 = Math.min(x0, x - 1.5); x1 = Math.max(x1, x + 1.5); }
+    if (x1 - x0 < wMin) {
+      // room to spare: centre on the action, but don't look past the ends of the field
+      const lim = L.halfW + 0.5;
+      let mid = (x0 + x1) / 2;
+      mid = clamp(mid, -lim + wMin / 2, lim - wMin / 2);
+      if (wMin > 2 * lim) mid = 0;
+      x0 = mid - wMin / 2; x1 = mid + wMin / 2;
+    }
+    let w = (x1 - x0) / share;
+    let cx = (x0 + x1) / 2 + w * (1 - share) / 2;
     if (game.phase === 'judge' && sim.tower.count) {
       // time's up: lean in on the tower
       const k = clamp(game.phaseT / 1.2, 0, 1) * 0.35;
       cx = lerp(cx, sim.tower.x, k);
       w = lerp(w, Math.max(14, (sim.tower.topY || 6) * 1.9), k);
       h = lerp(h, (sim.tower.topY || 6) + 4, k);
-      cy = lerp(cy, ((sim.tower.topY || 6) + 1) / 2, k);
     }
-    this.insetNow = lerp(this.insetNow, this.inset, 1 - Math.exp(-dt * 4));
-    const aspect = this.camera.aspect * (1 - this.insetNow);
-    const tan = Math.tan((this.camera.fov * Math.PI / 180) / 2);
     const dist = Math.max(h / 2 / tan, w / 2 / (tan * aspect));
+    // zoomed out, the grass stays along the bottom and the extra room goes to the sky
+    const cy = y0 + dist * tan;
     const target = { cx, cy, dist };
     if (!this.cam) this.cam = { ...target };
     const k = 1 - Math.exp(-dt * 2.2);

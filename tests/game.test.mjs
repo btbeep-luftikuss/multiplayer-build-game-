@@ -1,5 +1,5 @@
 // Round and player rules, run in Node: `npm test`.
-import { Game, finishHeightFor } from '../src/sim/game.js';
+import { Game, finishHeightFor, kitShare } from '../src/sim/game.js';
 import { STEP, LAYOUT } from '../src/sim/sim.js';
 
 let failures = 0;
@@ -66,6 +66,17 @@ ok(g.startRound(), 'play again');
 ok(a.inv[0].n === a.inv[0].max && g.sim.pieces.size === 0, 'fresh kits, fresh world');
 run(g, 3.1 + 20 + 4.2);
 ok(g.phase === 'result' && !g.result.success, 'no tower: the round fails');
+
+console.log('Fewer pieces each with more players');
+{
+  const total = (p) => p.inv.reduce((s, it) => s + it.n, 0);
+  const g2 = new Game(); g2.addPlayer('x', 'X'); g2.addPlayer('y', 'Y'); g2.startRound();
+  const g8 = new Game(); for (let i = 0; i < 8; i++) g8.addPlayer('p' + i, 'P' + i); g8.startRound();
+  const t2 = total(g2.players.get('x')), t8 = total(g8.players.get('p0'));
+  console.log(`   the Lumberyard kit: ${t2} pieces with 2 players, ${t8} with 8 (share ${kitShare(8).toFixed(2)})`);
+  ok(t8 < t2 * 0.6 && t8 > 0, 'with 8 players each kit is about half');
+  ok(g8.players.get('p7').inv.every((it) => it.n >= 1), 'but every kind of piece is still there');
+}
 
 console.log('Back to the lobby');
 {

@@ -24,6 +24,8 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 
 The phone shows your claw's state, the **rope** strain and how hard your **grip** is working (an off-centre grab on a heavy beam slips). On the TV your claw, its name tag and the outline of whatever you're holding are in your colour, and a dotted line shows where your piece will land.
 
+The more players there are, the wider the build pad and the fewer pieces each player gets (2 players get their full kit, 8 players about half each). The TV camera zooms in when the claws are close together and out as they spread across the field.
+
 ### Power-ups
 
 Every 35–55 seconds someone gets a special piece (and a rescue after a collapse):

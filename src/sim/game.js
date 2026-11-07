@@ -26,7 +26,12 @@ export function cleanName(name, fallback) {
   return s || fallback;
 }
 
-const kitInventory = (slot) => KITS[slot % KITS.length].items.map(([id, n]) => ({ id, n, max: n }));
+// the more players, the fewer pieces each (2 players get the full kit, 8 about half)
+export const kitShare = (players) => Math.max(0.45, 1 - (Math.max(2, players) - 2) * 0.09);
+const kitInventory = (slot, players = 2) => KITS[slot % KITS.length].items.map(([id, n]) => {
+  const m = Math.max(1, Math.round(n * kitShare(players)));
+  return { id, n: m, max: m };
+});
 
 export class Game {
   constructor({ settings, random = Math.random } = {}) {
@@ -75,7 +80,7 @@ export class Game {
     if (slot < 0) return null;
     const p = {
       id, slot, name: cleanName(name, `Player ${slot + 1}`), color: PLAYER_COLORS[slot].hex, colorName: PLAYER_COLORS[slot].name,
-      kit: KITS[slot % KITS.length], inv: kitInventory(slot), connected: true, leftAt: -1, present: false,
+      kit: KITS[slot % KITS.length], inv: kitInventory(slot, this.activeCount + 1), connected: true, leftAt: -1, present: false,
       joinedAt: this.clock(), stats: this.freshStats(), specialsGot: 0, lastRestock: 0, invVersion: 1,
     };
     this.players.set(id, p);
@@ -210,7 +215,7 @@ export class Game {
     this.round++;
     this.newSim();
     for (const p of this.players.values()) {
-      p.inv = kitInventory(p.slot);
+      p.inv = kitInventory(p.slot, this.activeCount);
       p.invVersion++;
       p.stats = this.freshStats();
       p.specialsGot = 0;
@@ -229,7 +234,7 @@ export class Game {
   // back to free play (to change settings, or wait for more players)
   toLobby() {
     this.newSim();
-    for (const p of this.players.values()) { p.inv = kitInventory(p.slot); p.invVersion++; }
+    for (const p of this.players.values()) { p.inv = kitInventory(p.slot, this.activeCount); p.invVersion++; }
     this.result = null;
     this.timeLeft = this.settings.roundTime;
     this.setPhase('lobby');

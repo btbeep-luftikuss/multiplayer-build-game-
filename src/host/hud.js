@@ -168,7 +168,7 @@ export class Hud {
     // labels on the finish line and the tower top
     const fl = $('#finish-label', this.root);
     const fp = r.project(-sim.layout.padHalf - 1.2, sim.finishY, -1.1);
-    fl.style.transform = `translate(${fp.x}px, ${fp.y}px) translate(-100%, -50%)`;
+    fl.style.transform = `translate(${Math.max(fp.x, fl.offsetWidth + 12)}px, ${fp.y}px) translate(-100%, -50%)`; // (stays on screen when zoomed in)
     $('b', fl).textContent = `${sim.finishHeight} m`;
     fl.classList.toggle('over', h >= sim.finishHeight);
     const hl = $('#height-label', this.root);

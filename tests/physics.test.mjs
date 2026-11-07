@@ -285,7 +285,7 @@ console.log('Two claws share a heavy load');
   const slab = sim.createPiece('stone-slab', 0, -3, LAYOUT.padTop + 0.4, 0);
   run(sim, 1);
   const L = lenFor(sim, slab.top + 0.02);
-  steerUntil(sim, a, -4.1, 3, 12); steerUntil(sim, b, -1.9, 3, 12);
+  steerUntil(sim, a, -1.9, 3, 14); steerUntil(sim, b, -4.1, 3, 14);
   a.drop(); b.drop();
   run(sim, 8, () => (a.state === 'holding' && b.state === 'holding' && !a.auto && !b.auto ? false : undefined));
   ok(a.hold?.piece === slab && b.hold?.piece === slab, 'both claws hold the heavy base');
