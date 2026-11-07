@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1e1533">
+<meta name="description" content="Clawstruction: a couch co-op tower-building party game. The TV is the game, your phones are the claw controllers.">
+<title>Clawstruction</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='4' width='52' height='8' rx='3' fill='%23ff9f1c'/%3E%3Cpath d='M32 12v14' stroke='%23fff' stroke-width='3'/%3E%3Crect x='22' y='26' width='20' height='8' rx='3' fill='%23ffc928' stroke='%231e1533' stroke-width='2'/%3E%3Cpath d='M24 34l-6 10 6 6M40 34l6 10-6 6' fill='none' stroke='%231e1533' stroke-width='4' stroke-linecap='round'/%3E%3Crect x='26' y='48' width='12' height='12' rx='2' fill='%23e3a35a' stroke='%231e1533' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>html,body{margin:0;height:100%;background:#1e1533;color:#fff;font-family:system-ui,sans-serif}#boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;opacity:.8}</style>
+</head>
+<body>
+<div id="boot">Loading Clawstruction…</div>
+<noscript>Clawstruction needs JavaScript.</noscript>
+<script>
+// TV or phone? A ?join link (from the QR code) or a small touch screen is a phone controller;
+// anything else hosts the game. ?tv and ?phone force one or the other.
+(function () {
+  var q = new URLSearchParams(location.search);
+  var touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  var small = Math.min(screen.width, screen.height) < 820;
+  var phone = q.has('join') || q.has('phone') || (!q.has('tv') && touch && small);
+  var s = document.createElement('script');
+  s.src = (phone ? 'phone.js' : 'tv.js') + '?v=__VERSION__';
+  s.onerror = function () { document.getElementById('boot').textContent = 'Could not load the game. Check your connection and reload.'; };
+  document.body.appendChild(s);
+  window.addEventListener('error', function (e) {
+    var b = document.getElementById('boot');
+    if (b && b.isConnected && !document.body.className) b.textContent = 'Something went wrong: ' + (e.message || e);
+  });
+})();
+</script>
+</body>
+</html>

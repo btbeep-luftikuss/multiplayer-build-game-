@@ -1,0 +1,19 @@
+{
+  "name": "clawstruction",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clawstruction: a couch co-op tower-building party game. The TV runs the game, phones are the controllers.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node tests/physics.test.mjs && node tests/game.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "peerjs": "1.5.5",
+    "planck": "1.5.1",
+    "qrcode-generator": "2.0.4",
+    "three": "0.187.0"
+  }
+}
