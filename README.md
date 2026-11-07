@@ -20,7 +20,7 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 | **The big pad** | Drag left or right (from anywhere on it) to run your claw along the top bar; it swings when you stop. Drag up to reel the rope in (lift), down to let it out (lower); heavy loads reel in slower. Diagonally does both. |
 | **GRAB** | Closes the claw on whatever is between its fingers. Tap again (**LET GO**) to drop it. |
 | **DROP ⤓** | Claw-machine style: lowers the claw on its own, then grabs what it lands on (or lets go of what it carries, gently). |
-| **⟲ ⟳ turn** | Turns the piece you're holding 45° (hold to keep turning). With an empty claw, it spins the newest piece on your platform. |
+| **⟲ ⟳ turn** | Spins the piece waiting on your shelf 45° (it sits on a turntable). Pieces can only be turned there, not once they're in the claw. |
 | **0° button** | Sets which way up new pieces arrive (shown on the cards). |
 
 The phone shows your claw's state, the **rope** strain and how hard your **grip** is working (an off-centre grab on a heavy beam slips). On the TV your claw, its name tag and the outline of whatever you're holding are in your colour, and a dotted line shows where your piece will land.

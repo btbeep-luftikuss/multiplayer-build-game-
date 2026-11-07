@@ -87,6 +87,22 @@ ok(a.inv[0].n === a.inv[0].max && g.sim.pieces.size === 0, 'fresh kits, fresh wo
 run(g, 3.1 + 20 + 4.2);
 ok(g.phase === 'result' && !g.result.success, 'no tower: the round fails');
 
+console.log('Pieces only turn on the shelf');
+{
+  const t = new Game(); t.addPlayer('x', 'X'); t.startRound();
+  run(t, 3.2);
+  t.spawn('x', 1, 0); // a long beam
+  run(t, 1);
+  const beam = [...t.sim.pieces][0];
+  ok(t.rotate('x', 1) === 'platform', 'the turn button spins the piece on the shelf');
+  run(t, 1);
+  const a0 = beam.body.getAngle();
+  t.sim.claws.get(0).attach(beam, false);
+  ok(t.rotate('x', 1) === false, 'but not once it is in the claw');
+  run(t, 1);
+  ok(Math.abs(beam.body.getAngle() - a0) < 0.05, 'which keeps it at the angle it had');
+}
+
 console.log('Fewer pieces each with more players');
 {
   const total = (p) => p.inv.reduce((s, it) => s + it.n, 0);

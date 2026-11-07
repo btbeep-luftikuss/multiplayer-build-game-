@@ -146,6 +146,7 @@ function onStatus(s) {
   grab.textContent = s.g === 2 ? 'LET GO' : s.g === 1 ? 'OPEN' : 'GRAB';
   grab.classList.toggle('holding', s.g === 2);
   $('#pad .drop').classList.toggle('busy', s.au);
+  for (const t of document.querySelectorAll('#pad .turn')) t.classList.toggle('off', s.g === 2); // only on the shelf
   meter('.rope', s.tn);
   meter('.grip', s.g === 2 ? s.sn : 0);
   $('#pad .grip').classList.toggle('off', s.g !== 2);
@@ -324,7 +325,7 @@ function renderOverlay() {
       `<label class="rename">Name <input maxlength="12" value="${esc(me?.name || '')}"><button data-act="rename">Save</button></label>` +
       (st?.ld && (st.ph === 'play' || st.ph === 'countdown') ? `<button data-act="restart">Restart the round</button>` : '') +
       `<button data-act="fullscreen">Full screen</button><button data-act="code">Leave the game</button><button class="big" data-act="close">Back</button>` +
-      `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). On the big pad, drag left and right to slide your claw along the bar, up and down to raise and lower it (diagonally does both). GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn what you're holding (or the piece waiting on your shelf). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
+      `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). On the big pad, drag left and right to slide your claw along the bar, up and down to raise and lower it (diagonally does both). GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn the piece waiting on your shelf (pieces can't be turned once they're in the claw). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
   }
   o.innerHTML = html;
   o.classList.toggle('show', !!html);

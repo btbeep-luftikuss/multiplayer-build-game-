@@ -141,9 +141,10 @@ export class Game {
     const p = this.players.get(id), c = this.claw(p);
     if (!c || !this.canAct()) return false;
     dir = dir > 0 ? 1 : -1;
-    if (c.rotateStart(dir)) return 'held';
+    // pieces only turn on the spawn shelf (its turntable), never in the claw
+    if (c.hold) { this.toast(p, 'Turn pieces on your shelf, before you grab them'); return false; }
     if (this.sim.turnPlatformPiece(p.slot, dir)) return 'platform';
-    this.toast(p, 'Nothing to turn: grab a piece, or put one on your shelf');
+    this.toast(p, 'Nothing on your shelf to turn');
     return false;
   }
 
