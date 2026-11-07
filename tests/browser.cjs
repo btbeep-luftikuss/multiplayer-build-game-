@@ -71,9 +71,9 @@ const ok = (cond, msg) => { console.log(`${cond ? '  ok ' : 'FAIL '} ${msg}`); i
   await tap(ana, '.buttons .drop');
   await tv.waitForFunction(() => { const c = window.__claw.game.sim.claws.get(0); return c.state === 'holding' && !c.auto; }, null, { timeout: 20000 });
   ok(true, 'DROP lowers the claw onto the shelf and grabs the piece');
-  await drag(ana, '.stick.rope', 0, -80, 900);
+  await drag(ana, '.stick.both', 0, -80, 900);
   const x0 = (await claw(0)).x;
-  await drag(ana, '.stick.move', 80, 0, 1600);
+  await drag(ana, '.stick.both', 80, 0, 1600);
   ok((await claw(0)).x > x0 + 1, 'the MOVE pad moves the claw');
   await sleep(1500);
   await tap(ana, '.buttons .drop');

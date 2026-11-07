@@ -52,8 +52,7 @@ document.body.innerHTML = `
     <div class="cards"></div>
   </div>
   <div class="sticks">
-    <div class="stick move"><div class="label">◀ MOVE ▶</div><div class="rail"></div><div class="knob"></div></div>
-    <div class="stick rope"><div class="label">ROPE<br>▲ up<br>▼ down</div><div class="rail"></div><div class="knob"></div></div>
+    <div class="stick both"><div class="label"><span class="v">▲ rope up</span><span class="h">◀ MOVE ▶</span><span class="v">▼ rope down</span></div><div class="rail h"></div><div class="rail v"></div><div class="knob"></div></div>
   </div>
   <div class="buttons">
     <button class="turn ccw" data-d="1">⟲<small>turn</small></button>
@@ -212,16 +211,14 @@ $('#pad .angle').onclick = () => { spawnAngle = (spawnAngle + 1) % 8; renderCard
 
 const input = { mx: 0, ry: 0, sentMx: 0, sentRy: 0, sentAt: 0 };
 
-function stick(el, axis) {
+// one big pad: drag left/right to move the claw, up/down to reel the rope, diagonally for both.
+// It works from wherever the thumb lands, so there's no need to look at it.
+function stick(el) {
   const knob = el.querySelector('.knob');
   let id = null, x0 = 0, y0 = 0;
-  const range = () => Math.min(90, (axis === 'x' ? el.clientWidth : el.clientHeight) * 0.32);
-  const set = (v) => {
-    const dead = 0.12;
-    const out = Math.abs(v) < dead ? 0 : Math.sign(v) * (Math.abs(v) - dead) / (1 - dead);
-    if (axis === 'x') input.mx = out; else input.ry = out;
-    pushInput();
-  };
+  const range = () => Math.min(90, Math.min(el.clientWidth, el.clientHeight) * 0.3);
+  // each direction has its own small dead zone, so moving sideways doesn't nudge the rope
+  const shape = (v) => { const dead = 0.15; return Math.abs(v) < dead ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - dead) / (1 - dead)); };
   el.addEventListener('pointerdown', (e) => {
     if (id !== null) return;
     id = e.pointerId;
@@ -237,27 +234,25 @@ function stick(el, axis) {
     if (e.pointerId !== id) return;
     const r = el.getBoundingClientRect();
     const R = range();
-    if (axis === 'x') {
-      const d = Math.max(-R, Math.min(R, e.clientX - x0));
-      knob.style.left = `${x0 - r.left + d}px`; knob.style.top = `${y0 - r.top}px`;
-      set(d / R);
-    } else {
-      const d = Math.max(-R, Math.min(R, e.clientY - y0));
-      knob.style.left = `${x0 - r.left}px`; knob.style.top = `${y0 - r.top + d}px`;
-      set(-d / R);
-    }
+    let dx = e.clientX - x0, dy = e.clientY - y0;
+    const d = Math.hypot(dx, dy);
+    if (d > R) { dx *= R / d; dy *= R / d; }
+    knob.style.left = `${x0 - r.left + dx}px`; knob.style.top = `${y0 - r.top + dy}px`;
+    input.mx = shape(dx / R);
+    input.ry = shape(-dy / R);
+    pushInput();
   });
   const end = (e) => {
     if (e.pointerId !== id) return;
     id = null;
     el.classList.remove('active');
-    set(0);
+    input.mx = 0; input.ry = 0;
+    pushInput();
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
 }
-stick($('#pad .stick.move'), 'x');
-stick($('#pad .stick.rope'), 'y');
+stick($('#pad .stick.both'));
 
 function pushInput(force = false) {
   const now = performance.now();
@@ -328,7 +323,7 @@ function renderOverlay() {
       `<label class="rename">Name <input maxlength="12" value="${esc(me?.name || '')}"><button data-act="rename">Save</button></label>` +
       (st?.ld && (st.ph === 'play' || st.ph === 'countdown') ? `<button data-act="restart">Restart the round</button>` : '') +
       `<button data-act="fullscreen">Full screen</button><button data-act="code">Leave the game</button><button class="big" data-act="close">Back</button>` +
-      `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). MOVE slides your claw along the bar, ROPE lowers and raises it. GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn what you're holding (or the piece waiting on your shelf). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
+      `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). On the big pad, drag left and right to slide your claw along the bar, up and down to raise and lower it (diagonally does both). GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn what you're holding (or the piece waiting on your shelf). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
   }
   o.innerHTML = html;
   o.classList.toggle('show', !!html);

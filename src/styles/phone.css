@@ -58,15 +58,15 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #pad .leader-bar .start { background: var(--good); flex: 2; box-shadow: 0 4px 0 #000; }
 #pad .leader-bar .wait { flex: 1; text-align: center; font-weight: 700; background: var(--ink2); border-radius: 12px; padding: 6px; font-size: 15px; }
 
-#pad .inventory { display: flex; gap: 6px; height: 104px; flex: none; }
-#pad .angle { width: 58px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; font-size: 14px; }
+#pad .inventory { display: flex; gap: 6px; height: 132px; flex: none; }
+#pad .angle { width: 64px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px; font-size: 14px; }
 #pad .angle svg { width: 30px; height: 30px; }
 #pad .cards { flex: 1; display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; scrollbar-width: none; scroll-snap-type: x proximity; }
 #pad .cards::-webkit-scrollbar { display: none; }
-#pad .card { position: relative; flex: none; width: 86px; height: 100%; padding: 2px 2px 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; scroll-snap-align: start; background: var(--paper); }
+#pad .card { position: relative; flex: none; width: 112px; height: 100%; padding: 4px 4px 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; scroll-snap-align: start; background: var(--paper); }
 #pad .card svg { width: 100%; height: 100%; }
-#pad .card .nm { position: absolute; left: 2px; right: 2px; bottom: 2px; font-size: 11px; line-height: 1.1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#pad .card .n { position: absolute; top: 2px; right: 4px; font-size: 15px; background: var(--ink); color: #fff; border-radius: 8px; padding: 0 5px; line-height: 1.3; }
+#pad .card .nm { position: absolute; left: 2px; right: 2px; bottom: 3px; font-size: 14px; line-height: 1.1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#pad .card .n { position: absolute; top: 3px; right: 5px; font-size: 17px; background: var(--ink); color: #fff; border-radius: 8px; padding: 0 5px; line-height: 1.3; }
 #pad .card.special { background: linear-gradient(135deg, #fff3a8, #ffd1f0); box-shadow: 0 0 0 3px var(--me); animation: glow 1s ease-in-out infinite alternate; }
 @keyframes glow { to { box-shadow: 0 0 0 3px var(--me), 0 0 14px 4px var(--me); } }
 #pad .card.empty { opacity: 0.35; }
@@ -76,12 +76,14 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #pad .card.tapped { animation: tap 0.25s; }
 @keyframes tap { 50% { transform: scale(0.9); } }
 
-#pad .sticks { flex: 1; display: grid; grid-template-columns: 1.5fr 1fr; gap: 8px; min-height: 120px; }
+#pad .sticks { flex: 1; display: flex; min-height: 140px; }
+#pad .stick.both { flex: 1; }
 #pad .stick { position: relative; border-radius: 20px; border: 3px solid #000; background: var(--ink2); touch-action: none; overflow: hidden; }
-#pad .stick .label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 20px; font-weight: 800; opacity: 0.4; line-height: 1.15; pointer-events: none; }
+#pad .stick .label { position: absolute; inset: 8px 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; font-size: 17px; font-weight: 800; opacity: 0.4; line-height: 1.15; pointer-events: none; }
+#pad .stick .label .h { font-size: 22px; }
 #pad .stick .rail { display: none; position: absolute; background: rgba(255, 255, 255, 0.15); border-radius: 10px; pointer-events: none; }
-#pad .stick.move .rail { left: calc(var(--ox) - 90px); width: 180px; top: calc(var(--oy) - 10px); height: 20px; }
-#pad .stick.rope .rail { top: calc(var(--oy) - 90px); height: 180px; left: calc(var(--ox) - 10px); width: 20px; }
+#pad .stick .rail.h { left: calc(var(--ox) - 90px); width: 180px; top: calc(var(--oy) - 8px); height: 16px; }
+#pad .stick .rail.v { top: calc(var(--oy) - 90px); height: 180px; left: calc(var(--ox) - 8px); width: 16px; }
 #pad .stick .knob { display: none; position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: var(--me); border: 4px solid #000; pointer-events: none; box-shadow: 0 4px 0 #000; }
 #pad .stick.active { background: #3a2d5e; }
 #pad .stick.active .knob, #pad .stick.active .rail { display: block; }
@@ -96,24 +98,23 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #pad .buttons button.down { transform: translateY(4px); box-shadow: 0 1px 0 #000; filter: brightness(0.92); }
 
 @media (orientation: landscape) and (max-height: 520px) {
-  /* two thumbs: MOVE under the left one, ROPE under the right one, everything else between them */
+  /* two thumbs: the move/rope pad under the left one, pieces and buttons under the right */
   #pad { display: none; }
   #pad.show {
     display: grid; gap: 6px;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 0.8fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
     grid-template-rows: 34px auto auto minmax(0, 1fr) auto;
-    grid-template-areas: "head head head" "move status rope" "move leader rope" "move inv rope" "move btns rope";
+    grid-template-areas: "head head" "move status" "move leader" "move inv" "move btns";
   }
   #pad.show > * { min-width: 0; min-height: 0; }
   #pad header { grid-area: head; height: 34px; }
   #pad .status { grid-area: status; }
   #pad .leader-bar { grid-area: leader; }
   #pad .leader-bar button { font-size: 16px; padding: 4px; }
-  #pad .inventory { grid-area: inv; height: 100%; max-height: 110px; }
-  #pad .card { width: 72px; }
+  #pad .inventory { grid-area: inv; height: 100%; max-height: 132px; }
+  #pad .card { width: 96px; }
   #pad .sticks { display: contents; }
-  #pad .stick.move { grid-area: move; }
-  #pad .stick.rope { grid-area: rope; }
+  #pad .stick.both { grid-area: move; }
   #pad .buttons { grid-area: btns; grid-template-rows: 46px 54px; gap: 6px; }
   #pad .buttons button { font-size: 22px; }
   #pad .buttons button small { display: none; }
