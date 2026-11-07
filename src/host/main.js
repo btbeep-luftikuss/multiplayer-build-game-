@@ -25,7 +25,8 @@ document.body.innerHTML = '<canvas id="view"></canvas><div id="ui"></div>';
 const canvas = document.getElementById('view');
 
 let quality = params.get('quality') || store.get('quality') || 'high';
-const game = new Game({ settings: store.get('settings') || undefined });
+// Levels mode progress lives on the TV (which levels are unlocked and done, the best team times)
+const game = new Game({ settings: store.get('settings') || undefined, progress: store.get('progress'), mode: store.get('mode') || 'free', level: store.get('level') ?? 1 });
 let renderer;
 try {
   renderer = new Renderer(canvas, { quality });
@@ -40,6 +41,9 @@ sound.setMusic(store.get('music') !== false);
 const hud = new Hud(document.getElementById('ui'), {
   start: () => startOrRestart(),
   lobby: () => game.toLobby(),
+  next: () => game.nextLevel(),
+  mode: (m) => game.setMode(m),
+  level: (id) => game.setLevel(id),
   setting: (k, v) => { if (game.setSetting(k, v)) store.set('settings', game.settings); },
   menu: (act, btn) => {
     if (act === 'restart') game.startRound();
@@ -126,6 +130,9 @@ function onPhone(cid, m) {
     case 'start': if (leader) startOrRestart(); break;
     case 'restart': if (leader && (game.phase === 'play' || game.phase === 'countdown' || game.phase === 'hold')) game.startRound(); break;
     case 'lobby': if (leader && game.phase === 'result') game.toLobby(); break;
+    case 'next': if (leader) game.nextLevel(); break;
+    case 'mode': if (leader) game.setMode(m.m); break;
+    case 'level': if (leader) game.setLevel(m.id === 'remix' ? 'remix' : Number(m.id)); break;
     default: break;
   }
 }
@@ -138,9 +145,10 @@ function sendInventory(p) {
   if (s) s.inv = p.invVersion;
 }
 
+const cfgKeyNow = () => JSON.stringify([game.settings, game.mode, game.levelId, game.progress]);
 function sendSettings(p) {
-  const key = JSON.stringify(game.settings);
-  net.send(p.id, { t: 'cfg', settings: game.settings });
+  const key = cfgKeyNow();
+  net.send(p.id, { t: 'cfg', settings: game.settings, lv: game.levelsInfo() });
   const s = lastSent.get(p.id);
   if (s) s.cfg = key;
 }
@@ -148,7 +156,8 @@ function sendSettings(p) {
 function resultFor(p) {
   const r = game.result;
   const me = r.players.find((x) => x.slot === p.slot);
-  return { t: 'res', ok: r.success, early: r.early, left: Math.ceil(r.timeLeft), h: r.height, f: r.finish, stars: r.stars, placed: me?.placed || 0, awards: r.awards.filter((a) => a.slot === p.slot).map((a) => a.title) };
+  const lv = r.level ? { id: r.level.id, name: r.level.name, time: r.level.time, best: !!r.newBest, unlocked: r.unlocked || null, next: r.next || null } : null;
+  return { t: 'res', lv, ok: r.success, early: r.early, left: Math.ceil(r.timeLeft), h: r.height, f: Math.round(r.finish * 10) / 10, stars: r.stars, placed: me?.placed || 0, awards: r.awards.filter((a) => a.slot === p.slot).map((a) => a.title) };
 }
 
 const BUZZ = { grab: [25, 30, 25], miss: [70], release: [15], lock: [10, 25, 10] };
@@ -156,6 +165,13 @@ const BUZZ = { grab: [25, 30, 25], miss: [70], release: [15], lock: [10, 25, 10]
 function relay(e) {
   const bySlot = (slot) => { for (const p of game.players.values()) if (p.slot === slot) return p; return null; };
   if (e.type === 'toast') { net.send(e.id, { t: 'toast', text: e.text, big: e.big }); return; }
+  if (e.type === 'progress') { store.set('progress', e.progress); return; }
+  if (e.type === 'settings') { store.set('mode', game.mode); store.set('level', game.levelId); }
+  if (e.type === 'glitch') {
+    const p = bySlot(e.slot);
+    if (p) { net.send(p.id, { t: 'buzz', p: [120, 40, 60] }); net.send(p.id, { t: 'toast', text: { slip: 'Your grip slipped!', stretch: 'Your rope stretched!', drop: 'Your claw let go!' }[e.kind] }); }
+  }
+  if (e.type === 'boost') { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: [30, 30, 30, 30, 200] }); }
   if (BUZZ[e.type] && e.slot !== undefined) { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: BUZZ[e.type] }); }
   if (e.type === 'powerup') { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: [40, 60, 40, 60, 120] }); }
   const all = (msg) => { for (const p of game.players.values()) if (p.connected) net.send(p.id, msg); };
@@ -168,7 +184,7 @@ function relay(e) {
 
 // status to every phone, ten times a second
 setInterval(() => {
-  const cfgKey = JSON.stringify(game.settings);
+  const cfgKey = cfgKeyNow();
   for (const p of game.players.values()) {
     if (!p.connected) continue;
     const s = lastSent.get(p.id);

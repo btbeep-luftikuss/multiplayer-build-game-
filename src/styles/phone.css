@@ -56,6 +56,14 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #pad .leader-bar:empty { display: none; }
 #pad .leader-bar button { flex: 1; font-size: 20px; padding: 8px; }
 #pad .leader-bar .start { background: var(--good); flex: 2; box-shadow: 0 4px 0 #000; }
+#pad .leader-bar { flex-wrap: wrap; }
+#pad .leader-bar .lvname { width: 100%; text-align: center; font-weight: 800; font-size: 15px; background: var(--ink2); border-radius: 10px; padding: 2px 8px; }
+.sheet .levels { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.sheet .levels .lv { text-align: left; font-size: 16px; padding: 7px 10px; }
+.sheet .levels .lv.sel { background: var(--me); }
+.sheet .levels .lv.done { box-shadow: inset 6px 0 0 #2fd27a; }
+.sheet .levels .lv:disabled { opacity: 0.4; }
+.sheet .levels .lv .best { float: right; font-size: 13px; color: #1f9d55; }
 #pad .leader-bar .wait { flex: 1; text-align: center; font-weight: 700; background: var(--ink2); border-radius: 12px; padding: 6px; font-size: 15px; }
 
 #pad .inventory { display: flex; gap: 6px; height: 132px; flex: none; }

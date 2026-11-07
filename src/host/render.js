@@ -316,15 +316,22 @@ export class Renderer {
     ground.position.set(0, -1.5, -1.5);
     ground.receiveShadow = true;
     w.add(ground);
-    // the build pad
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(sim.layout.padHalf * 2, LAYOUT.padTop, 2.2), [
-      this.toon('#ffffff', { map: TX.stripesTexture() }), this.toon('#ffffff', { map: TX.stripesTexture() }),
-      this.toon('#ffffff', { map: TX.concreteTexture() }), this.toon('#bdb6aa'),
-      this.toon('#ffffff', { map: TX.signTexture('BUILD HERE       ·       BUILD HERE       ·       BUILD HERE', '#ffc21a', '#2a2a2a', 2048, 26) }), this.toon('#bdb6aa'),
-    ]);
-    pad.position.set(0, LAYOUT.padTop / 2, 0);
-    pad.receiveShadow = pad.castShadow = true;
-    w.add(pad);
+    // the build pad (and what it stands on), which may move: synced from the physics every frame
+    this.buildPad(sim, w);
+    // the lava (Levels): a glowing pool that rises up the sides
+    this.lava = null;
+    if (sim.mods.lava) {
+      this.lava = new THREE.Mesh(new THREE.BoxGeometry(gh * 2 + 30, 30, 14), new THREE.MeshToonMaterial({ color: '#ff5a14', emissive: new THREE.Color('#ff3c00'), emissiveIntensity: 0.7, gradientMap: this.ramp }));
+      this.lava.position.set(0, -20, -1);
+      w.add(this.lava);
+    }
+    // low gravity on the right (Levels): a purple haze over that half
+    this.zone = null;
+    if (sim.mods.gravity) {
+      this.zone = new THREE.Mesh(new THREE.PlaneGeometry(gh, sim.topY + 2), new THREE.MeshBasicMaterial({ color: '#9b6bff', transparent: true, opacity: 0.16, depthWrite: false }));
+      this.zone.position.set(gh / 2, (sim.topY + 2) / 2 - 1, -1.45);
+      w.add(this.zone);
+    }
     // the top bar (a gantry): a striped beam held up by two towers at the ends
     const top = sim.topY;
     const barMat = this.toon('#ffffff', { map: TX.stripesTexture('#ff9f1c', '#3a3a48', 8) });
@@ -346,22 +353,26 @@ export class Renderer {
       brace.rotation.z = sx * 0.6;
       w.add(brace);
     }
-    // the finish line: a checkered band behind the build and a glowing sheet across it
+    // the finish line: a dotted band behind the build and a glowing sheet across it (in a group of its
+    // own, which follows the line when it moves)
     const fy = sim.finishY;
+    const fg = this.finishGroup = new THREE.Group();
+    this.finishBuiltY = fy;
+    w.add(fg);
     const fw = sim.layout.groundHalf * 2;
     const dots = TX.dotsTexture();
     dots.repeat.set(fw / 0.6, 1);
     this.finishBand = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.3), new THREE.MeshBasicMaterial({ map: dots, transparent: true, depthWrite: false }));
     this.finishBand.position.set(0, fy, -1.05);
-    w.add(this.finishBand);
+    fg.add(this.finishBand);
     // and the same dots in front of the build, so the line reads across the tower too
     const front = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.3), new THREE.MeshBasicMaterial({ map: dots, transparent: true, opacity: 0.55, depthWrite: false }));
     front.position.set(0, fy, 1.05);
-    w.add(front);
+    fg.add(front);
     this.finishSheet = new THREE.Mesh(new THREE.PlaneGeometry(fw, 2.2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false }));
     this.finishSheet.rotation.x = -Math.PI / 2;
     this.finishSheet.position.set(0, fy, 0);
-    w.add(this.finishSheet);
+    fg.add(this.finishSheet);
     this.finishFlags = [];
     for (const sx of [-1, 1]) {
       const flag = new THREE.Group();
@@ -371,14 +382,57 @@ export class Renderer {
       cloth.position.set(sx * 0.45, 1.3, 0);
       flag.add(pole, cloth);
       flag.position.set(sx * (sim.layout.padHalf + 0.9), fy - 0.8, -1.1);
-      w.add(flag);
+      fg.add(flag);
       this.finishFlags.push(cloth);
     }
     // the tower's current top: a dashed marker
     this.topMarker = new THREE.Mesh(new THREE.PlaneGeometry(7, 0.06), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
-    this.topMarker.position.set(0, LAYOUT.padTop, -1.02);
+    this.topMarker.position.set(0, sim.padTop, -1.02);
     w.add(this.topMarker);
     this.scene.add(w);
+  }
+
+  buildPad(sim, w) {
+    this.padViews = [];
+    const signMat = () => this.toon('#ffffff', { map: TX.signTexture('BUILD HERE       ·       BUILD HERE       ·       BUILD HERE', '#ffc21a', '#2a2a2a', 2048, 26) });
+    const stripes = this.toon('#ffffff', { map: TX.stripesTexture() });
+    const concrete = this.toon('#ffffff', { map: TX.concreteTexture() });
+    const rock = this.toon('#ffffff', { map: TX.materialTexture('stone', '#a39486') });
+    const jelly = new THREE.MeshToonMaterial({ color: '#ff8fc8', gradientMap: this.ramp, transparent: true, opacity: 0.88, emissive: new THREE.Color('#ff4fa0'), emissiveIntensity: 0.15 });
+    for (const pb of sim.padBodies) {
+      let mesh;
+      if (pb.kind === 'soft') {
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), jelly);
+      } else if (pb.kind === 'tilt') {
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [stripes, stripes, concrete, this.toon('#bdb6aa'), signMat(), this.toon('#bdb6aa')]);
+      } else if (pb.hh * 2 > 0.6) {
+        // a tall pad: a rocky mesa with the sign along its top edge
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [rock, rock, concrete, rock, rock, rock]);
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(pb.hw * 2, 0.3), signMat());
+        sign.position.set(0, pb.hh - 0.15, 1.11);
+        mesh.add(sign);
+      } else {
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [stripes, stripes, concrete, this.toon('#bdb6aa'), signMat(), this.toon('#bdb6aa')]);
+      }
+      mesh.receiveShadow = mesh.castShadow = true;
+      w.add(mesh);
+      this.padViews.push({ mesh, body: pb.body });
+    }
+    if (sim.tub) {
+      const tub = new THREE.Mesh(new THREE.BoxGeometry(sim.tub.hw * 2 + 0.3, sim.tub.h, 2.3), this.toon('#8a5a36'));
+      tub.position.set(0, sim.tub.h / 2, 0);
+      w.add(tub);
+    }
+    if (sim.pivot) {
+      const ped = new THREE.Mesh(new THREE.BoxGeometry(sim.pivot.hw * 2, sim.pivot.h, 1.8), rock);
+      ped.position.set(0, sim.pivot.h / 2, 0);
+      const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 2.3, 16), this.toon('#5b5b6e'));
+      hinge.rotation.x = Math.PI / 2;
+      hinge.position.set(0, sim.padTop - 0.45, 0);
+      const neck = new THREE.Mesh(new THREE.BoxGeometry(0.5, sim.padTop - 0.45 - sim.pivot.h, 1.6), this.toon('#5b5b6e'));
+      neck.position.set(0, (sim.padTop - 0.45 + sim.pivot.h) / 2, 0);
+      w.add(ped, hinge, neck);
+    }
   }
 
   // ---------- following the simulation ----------
@@ -443,6 +497,12 @@ export class Renderer {
         drip.scale.y = 1.4;
         group.add(drip);
       }
+    }
+    // magnetic blocks wear their pole
+    if (def.pole) {
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: TX.letterTexture(def.pole > 0 ? 'N' : 'S'), transparent: true }));
+      plate.position.z = DEPTH / 2 + 0.01;
+      group.add(plate);
     }
     // a string for balloons (drawn from the knot to whatever it's tied to)
     let string = null;
@@ -643,7 +703,7 @@ export class Renderer {
     this.parts = this.parts.filter((p) => (p.life -= dt) > 0);
     for (const p of this.parts) {
       p.vy -= p.gravity * dt;
-      p.vx *= 1 - 2 * dt; p.vy *= 1 - 2 * dt; p.vz *= 1 - 2 * dt;
+      if (!p.keep) { p.vx *= 1 - 2 * dt; p.vy *= 1 - 2 * dt; p.vz *= 1 - 2 * dt; }
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
       const f = p.life / p.max;
       const s = p.size * (f > 0.7 ? (1 - f) / 0.3 + 0.3 : f / 0.7);
@@ -695,10 +755,14 @@ export class Renderer {
       case 'remove': this.puff(e.x, e.y, { n: 14, color: e.reason === 'pop' ? MATERIALS.balloon.color : '#ffffff', size: 0.3, speed: 3 }); break;
       case 'weld': this.puff(e.x, e.y, { n: 10, color: e.special === 'magnet' ? '#9fd4ff' : MATERIALS.goo.color, size: 0.16, speed: 2.5 }); break;
       case 'clamp': { const v = view(e.piece); if (v) { v.wobble = 1; v.flash = 1; } break; }
-      case 'anchor': this.puff(e.x, LAYOUT.padTop, { n: 16, color: '#d9c39a', size: 0.25, speed: 3 }); break;
+      case 'burn': this.puff(e.x, e.y + 0.2, { n: 18, color: '#ff8a1a', size: 0.3, speed: 3, up: 2 }); break;
+      case 'shatter': this.puff(e.x, e.y, { n: 22, color: '#c8f6ff', size: 0.16, speed: 5, gravity: 9, life: 0.9 }); this.shake(0.15); break;
+      case 'glitch': { const c = this.sim.claws.get(e.slot); if (c) { const p = c.body.getPosition(); this.puff(p.x, p.y, { n: 8, color: '#ff9a9a', size: 0.15, speed: 2 }); } break; }
+      case 'boost': { const c = this.sim.claws.get(e.slot); if (c) { const p = c.body.getPosition(); this.puff(p.x, p.y, { n: 24, color: '#ffd84a', size: 0.2, speed: 4 }); } break; }
+      case 'anchor': this.puff(e.x, this.sim.padTop, { n: 16, color: '#d9c39a', size: 0.25, speed: 3 }); break;
       case 'collapse':
         this.shake(0.7);
-        this.puff(e.x, LAYOUT.padTop + 0.5, { n: 40, color: '#e9dcc4', size: 0.55, speed: 5, life: 1.2 });
+        this.puff(e.x, this.sim.padTop + 0.5, { n: 40, color: '#e9dcc4', size: 0.55, speed: 5, life: 1.2 });
         break;
       case 'result':
         if (e.result.success) {
@@ -791,7 +855,7 @@ export class Renderer {
       }
       // the lamp: green when holding, white when open, grey when shut on nothing; dim if the player is away
       const away = player && !player.connected;
-      v.lampMat.color.set(away ? '#555555' : claw.state === 'holding' ? '#3dff7a' : claw.state === 'closed' ? '#9aa0b0' : '#ffffff');
+      v.lampMat.color.set(away ? '#555555' : claw.boosted ? (Math.sin(this.time * 20) > 0 ? '#ffd84a' : '#ffffff') : claw.state === 'holding' ? '#3dff7a' : claw.state === 'closed' ? '#9aa0b0' : '#ffffff');
       // rope from the trolley to the claw, sagging when slack, warmer in colour under strain
       const a = { x: tx, y: sim.topY - 0.28 };
       const b = claw.body.getWorldPoint({ x: 0, y: CLAW.ropeOnClaw });
@@ -832,7 +896,11 @@ export class Renderer {
     this.finishSheet.material.color.set(over ? '#5dff8a' : '#ffffff');
     this.finishSheet.material.opacity = over ? 0.35 + 0.15 * Math.sin(this.time * 6) : 0.18;
     for (const f of this.finishFlags) f.rotation.y = Math.sin(this.time * 3 + f.position.x) * 0.3;
-    this.topMarker.position.set(sim.tower.x, LAYOUT.padTop + sim.tower.height, -1.02);
+    this.topMarker.position.set(sim.tower.x, sim.padTop + sim.tower.height, -1.02);
+    // the level's moving parts
+    for (const v of this.padViews) { const p = v.body.getPosition(); v.mesh.position.set(p.x, p.y, 0); v.mesh.rotation.z = v.body.getAngle(); }
+    this.finishGroup.position.y = sim.finishY - this.finishBuiltY;
+    this.updateLevelEffects(dt, sim);
     this.topMarker.visible = sim.tower.height > 0.2;
     this.topMarker.material.color.set(over ? '#5dff8a' : '#ffffff');
 
@@ -849,6 +917,29 @@ export class Renderer {
     for (const l of this.blinkers) l.visible = Math.sin(this.time * 3) > 0;
     this.updateParticles(dt);
     this.updateCamera(dt, game);
+  }
+
+  updateLevelEffects(dt, sim) {
+    const L = sim.layout;
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const view = this.cam ? { x0: this.cam.cx - this.cam.dist * 0.5, x1: this.cam.cx + this.cam.dist * 0.5 } : { x0: -L.halfW, x1: L.halfW };
+    const add = (p) => { if (this.parts.length < 500) this.parts.push({ z: rnd(-1, 1.5), vz: 0, gravity: 0, keep: true, ...p, max: p.life, color: new THREE.Color(p.color) }); };
+    // lava: up it comes, bubbling
+    if (this.lava) {
+      this.lava.position.y = Math.max(-20, sim.lavaY - 15);
+      if (sim.lavaY > -0.5 && Math.random() < dt * 14) add({ x: rnd(view.x0, view.x1), y: sim.lavaY, vx: 0, vy: rnd(0.6, 1.4), life: 0.7, size: rnd(0.1, 0.22), color: Math.random() < 0.5 ? '#ffb020' : '#ff6a1a' });
+    }
+    // wind: streaks blowing across, more in a strong gust
+    if (sim.mods.wind && Math.abs(sim.wind) > 0.15 && Math.random() < dt * 40 * Math.abs(sim.wind) / sim.mods.wind.max) {
+      const dir = Math.sign(sim.wind);
+      add({ x: dir > 0 ? view.x0 : view.x1, y: rnd(sim.padTop + 0.5, sim.topY - 1), vx: dir * rnd(7, 11), vy: rnd(-0.3, 0.3), life: 3.5, size: 0.07, color: '#ffffff' });
+    }
+    // low gravity: slow purple sparkles drifting up on the right
+    if (this.zone && Math.random() < dt * 8) add({ x: rnd(0.3, L.halfW), y: rnd(0, sim.topY - 2), vx: 0, vy: rnd(0.3, 0.8), life: 2.5, size: 0.07, color: '#c9a8ff' });
+    // a Super Claw sparkles
+    for (const c of sim.claws.values()) {
+      if (c.boosted && Math.random() < dt * 20) { const p = c.body.getPosition(); add({ x: p.x + rnd(-0.6, 0.6), y: p.y + rnd(-0.5, 0.4), vx: 0, vy: 0.8, life: 0.6, size: 0.09, color: '#ffd84a' }); }
+    }
   }
 
   bottomOf(piece) {

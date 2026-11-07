@@ -276,6 +276,10 @@ export class Sound {
       case 'warn': this.warn(); if (e.n === 30) this.fast = true; break;
       case 'timeup': this.timeup(); this.drumroll(); break;
       case 'hold': this.warn(); this.drumroll(4.8); break;
+      case 'burn': this.noise({ dur: 0.5, vol: 0.3, type: 'highpass', freq: 2500, sweep: 6000 }); this.tone({ f: 120, f2: 60, dur: 0.3, vol: 0.15 }); break;
+      case 'shatter': for (let i = 0; i < 6; i++) this.tone({ f: 2000 + Math.random() * 3000, dur: 0.2, vol: 0.08, when: i * 0.03 }); this.noise({ dur: 0.15, vol: 0.3, type: 'highpass', freq: 3500 }); break;
+      case 'glitch': this.tone({ type: 'square', f: 300, f2: 120, dur: 0.25, vol: 0.1, lp: 1500 }); break;
+      case 'boost': this.tone({ type: 'sawtooth', f: 200, f2: 1600, dur: 0.5, vol: 0.12, lp: 3000 }); this.powerup(); break;
       case 'holdcount': this.tick(e.n); break;
       case 'holdfail': this.crash(); break;
       case 'collapse': this.crash(); break;

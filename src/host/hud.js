@@ -3,11 +3,13 @@
 import qrcode from 'qrcode-generator';
 import { PIECES } from '../shared/pieces.js';
 import { SETTING_CHOICES } from '../sim/game.js';
+import { LEVELS, REMIX, MOD_INFO, levelHeight } from '../shared/levels.js';
 import { LAYOUT } from '../sim/sim.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const m1 = (v) => String(Math.round(v * 10) / 10); // metres to one decimal place
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 export function drawQR(canvas, text, dark = '#1e1533') {
@@ -49,6 +51,9 @@ export class Hud {
         <div id="meter"><div class="track"><div class="fill"></div><div class="goal"><span>FINISH</span></div><div class="best"></div></div><div class="label"></div></div>
         <div id="finish-label">FINISH <b></b></div>
         <div id="height-label"></div>
+        <div id="level-chip"><b class="name"></b><span class="mods"></span></div>
+        <div id="level-intro"></div>
+        <div id="zone-label">🪐 LOW GRAVITY</div>
         <div id="tags"></div>
         <div id="pops"></div>
         <div id="banner"></div>
@@ -68,21 +73,29 @@ export class Hud {
             <div class="net">Connecting to the internet…</div>
           </div>
         </div>
+        <div class="tabs"><button data-mode="free">Free Play</button><button data-mode="levels">Levels</button></div>
+        <div class="levels-box">
+          <div class="level-grid"></div>
+          <div class="level-info"></div>
+        </div>
         <h2>Players <span class="count"></span></h2>
         <ul class="players"></ul>
-        <h2>Settings</h2>
-        <div class="settings"></div>
+        <div class="settings-box">
+          <h2>Settings</h2>
+          <div class="settings"></div>
+        </div>
         <button class="start big">Start the round</button>
         <p class="hint small">Press Enter, or the first player taps <b>Start</b> on their phone. Warm up with your claw while you wait!</p>
       </div>
       <div id="results" class="panel">
         <div class="verdict"></div>
+        <div class="level-line"></div>
         <div class="stars"></div>
         <div class="numbers"></div>
         <div class="awards"></div>
         <table class="table"></table>
-        <div class="buttons"><button class="again big">Play again</button><button class="tolobby">Change settings</button></div>
-        <p class="hint small">Or the first player taps <b>Play again</b> on their phone.</p>
+        <div class="buttons"></div>
+        <p class="hint small">Or the first player uses the buttons on their phone.</p>
       </div>
       <div id="menu" class="panel">
         <h2>Menu</h2>
@@ -100,8 +113,7 @@ export class Hud {
     this.results = $('#results', root);
     this.menu = $('#menu', root);
     $('.start', this.lobby).onclick = () => actions.start();
-    $('.again', this.results).onclick = () => actions.start();
-    $('.tolobby', this.results).onclick = () => actions.lobby();
+    for (const b of this.lobby.querySelectorAll('.tabs button')) b.onclick = () => actions.mode(b.dataset.mode);
     $('#menu-btn', root).onclick = () => this.toggleMenu();
     this.menu.addEventListener('click', (ev) => {
       const act = ev.target?.dataset?.act;
@@ -162,18 +174,18 @@ export class Hud {
     $('.goal', meter).style.bottom = `${(sim.finishHeight / top) * 100}%`;
     $('.best', meter).style.bottom = `${Math.min(100, (Math.max(game.best, h) / top) * 100)}%`;
     $('.best', meter).style.display = game.best > 0 ? '' : 'none';
-    $('.label', meter).innerHTML = `<b>${h.toFixed(1)}</b> / ${sim.finishHeight} m`;
+    $('.label', meter).innerHTML = `<b>${h.toFixed(1)}</b> / ${m1(sim.finishHeight)} m`;
     meter.classList.toggle('over', h >= sim.finishHeight);
 
     // labels on the finish line and the tower top
     const fl = $('#finish-label', this.root);
     const fp = r.project(-sim.layout.padHalf - 1.2, sim.finishY, -1.1);
     fl.style.transform = `translate(${Math.max(fp.x, fl.offsetWidth + 12)}px, ${fp.y}px) translate(-100%, -50%)`; // (stays on screen when zoomed in)
-    $('b', fl).textContent = `${sim.finishHeight} m`;
+    $('b', fl).textContent = `${m1(sim.finishHeight)} m`;
     fl.classList.toggle('over', h >= sim.finishHeight);
     const hl = $('#height-label', this.root);
     if (h > 0.2) {
-      const hp = r.project(sim.tower.x + 3.6, LAYOUT.padTop + h, -1);
+      const hp = r.project(sim.tower.x + 3.6, sim.padTop + h, -1);
       hl.style.display = '';
       hl.style.transform = `translate(${hp.x}px, ${hp.y}px) translate(0, -50%)`;
       hl.textContent = `${h.toFixed(1)} m`;
@@ -197,6 +209,37 @@ export class Hud {
       const text = esc(p.name) + icon + (p.connected ? '' : ' 💤');
       if (tag._text !== text) { tag.innerHTML = text; tag._text = text; }
       tag.classList.toggle('away', !p.connected);
+    }
+
+    // the level being played, and its mechanics (the wind's direction and strength live)
+    const lv = game.level;
+    const chip = $('#level-chip', this.root);
+    chip.classList.toggle('show', !!lv && !inLobby && phase !== 'result');
+    if (lv && !inLobby) {
+      const title = `${game.levelId === 'remix' ? '🎲 Remix' : 'Level ' + game.levelId}: ${lv.name}`;
+      if (chip._title !== title) { $('.name', chip).textContent = title; chip._title = title; }
+      const bits = [];
+      for (const k of Object.keys(lv.mods)) {
+        if (k === 'wind') {
+          const w = sim.wind, n = Math.min(3, Math.round(Math.abs(w) / sim.mods.wind.max * 3));
+          bits.push(`🌬️ ${w < -0.05 ? '◀'.repeat(Math.max(1, n)) : w > 0.05 ? '▶'.repeat(Math.max(1, n)) : '·'}`);
+        } else bits.push(`${MOD_INFO[k].icon} ${MOD_INFO[k].label}`);
+      }
+      const modsHtml = bits.map((b) => `<span>${esc(b)}</span>`).join('');
+      if (chip._mods !== modsHtml) { $('.mods', chip).innerHTML = modsHtml; chip._mods = modsHtml; }
+    }
+    const intro = $('#level-intro', this.root);
+    const showIntro = !!lv && (phase === 'countdown' || (phase === 'play' && game.elapsed < 2.5));
+    intro.classList.toggle('show', showIntro);
+    if (showIntro && intro._lv !== lv) {
+      intro._lv = lv;
+      intro.innerHTML = `<div class="t">${lv.icon} ${game.levelId === 'remix' ? 'Endless Remix' : 'Level ' + game.levelId}: ${esc(lv.name)}</div><div>${esc(lv.blurb)}</div><div class="goal">Reach <b>${sim.finishHeight.toFixed(1)} m</b> in <b>${fmtTime(lv.time)}</b>${Object.keys(lv.mods).length ? ' · ' + Object.keys(lv.mods).map((k) => MOD_INFO[k].icon + ' ' + MOD_INFO[k].label).join(' · ') : ''}</div>`;
+    }
+    const zl = $('#zone-label', this.root);
+    zl.classList.toggle('show', !!sim.mods.gravity);
+    if (sim.mods.gravity) {
+      const zp = r.project(sim.layout.padHalf * 0.5, sim.padTop + 0.5, -1.3);
+      zl.style.transform = `translate(${zp.x}px, ${zp.y}px) translate(-50%, 0)`;
     }
 
     // join chip stays up during a round, for late arrivals
@@ -230,6 +273,11 @@ export class Hud {
       $('.count', this.lobby).textContent = `${players.length}/8`;
       $('.start', this.lobby).disabled = players.length === 0;
     }
+    const lvKey = JSON.stringify([game.mode, game.levelId, game.progress, game.activeCount, game.level && game.level.mods]);
+    if (lvKey !== this.lastLevelsKey) {
+      this.lastLevelsKey = lvKey;
+      this.renderLevels(game);
+    }
     const skey = JSON.stringify(game.settings);
     if (skey !== this.lastSettingsKey) {
       this.lastSettingsKey = skey;
@@ -250,12 +298,56 @@ export class Hud {
     }
   }
 
+  // the lobby in Levels mode: every level (locked or not, done, best time), and the chosen one's details
+  renderLevels(game) {
+    const levels = game.mode === 'levels';
+    this.lobby.classList.toggle('mode-levels', levels);
+    for (const b of this.lobby.querySelectorAll('.tabs button')) b.classList.toggle('sel', b.dataset.mode === game.mode);
+    $('.start', this.lobby).textContent = levels ? `Start ${game.levelId === 'remix' ? 'the Remix' : 'Level ' + game.levelId}` : 'Start the round';
+    if (!levels) return;
+    const grid = $('.level-grid', this.lobby);
+    grid.innerHTML = '';
+    const card = (id, def, locked, done, best) => {
+      const b = el('button', 'lv' + (locked ? ' locked' : '') + (done ? ' done' : '') + (game.levelId === id ? ' sel' : ''));
+      b.innerHTML = `<span class="num">${id === 'remix' ? '🎲' : id}</span><span class="ic">${locked ? '🔒' : def.icon}</span>${done ? `<span class="tick">✓ ${best !== null ? fmtTime(best) : ''}</span>` : ''}`;
+      b.title = def.name;
+      if (!locked) b.onclick = () => this.actions.level(id);
+      grid.appendChild(b);
+    };
+    for (const l of LEVELS) {
+      const pr = game.progress.levels[l.id];
+      card(l.id, l, l.id > game.progress.unlocked, !!pr?.done, pr?.best ?? null);
+    }
+    card('remix', REMIX, !game.remixUnlocked, game.progress.remix.wins > 0, game.progress.remix.best);
+    const lv = game.level;
+    const pr = game.levelId === 'remix' ? null : game.progress.levels[game.levelId];
+    $('.level-info', this.lobby).innerHTML = `<div class="t">${lv.icon} ${game.levelId === 'remix' ? `Endless Remix <span class="small">(${game.progress.remix.wins} won)</span>` : `Level ${game.levelId}: ${esc(lv.name)}`}</div>` +
+      `<div class="small">${esc(lv.blurb)}</div>` +
+      `<div class="goal">Reach <b>${levelHeight(lv, game.activeCount).toFixed(1)} m</b> in <b>${fmtTime(lv.time)}</b>${pr?.best != null ? ` · best ${fmtTime(pr.best)}` : ''}</div>` +
+      `<div class="mods">${Object.keys(lv.mods).map((k) => `<span>${MOD_INFO[k].icon} ${MOD_INFO[k].label}</span>`).join('') || '<span>🧱 Just building</span>'}</div>`;
+  }
+
   showResult(res) {
     const R = this.results;
     R.classList.toggle('win', res.success);
-    $('.verdict', R).innerHTML = res.success ? 'THE TOWER STANDS!' : res.height < 0.5 ? 'NO TOWER…' : 'NOT TALL ENOUGH';
+    const lvl = res.level;
+    $('.verdict', R).innerHTML = lvl ? (res.success ? 'LEVEL COMPLETE!' : 'LEVEL FAILED') : res.success ? 'THE TOWER STANDS!' : res.height < 0.5 ? 'NO TOWER…' : 'NOT TALL ENOUGH';
+    $('.level-line', R).innerHTML = !lvl ? '' : `${lvl.icon} ${lvl.id === 'remix' ? 'Endless Remix' : 'Level ' + lvl.id}: ${esc(lvl.name)}` +
+      (res.success ? ` · in <b>${fmtTime(lvl.time)}</b>${res.newBest ? ' <span class="best">New best!</span>' : ''}` : '') +
+      (res.unlocked ? `<div class="unlock">🔓 ${res.unlocked === 'remix' ? 'Endless Remix' : 'Level ' + res.unlocked} unlocked!</div>` : '');
+    const btns = $('.buttons', R);
+    btns.innerHTML = '';
+    const button = (text, cls, fn) => { const b = el('button', cls, text); b.onclick = fn; btns.appendChild(b); };
+    if (lvl) {
+      if (res.success && res.next) button(res.next === 'remix' ? (lvl.id === 'remix' ? 'Next remix ▶' : 'Endless Remix ▶') : 'Next level ▶', 'big', () => this.actions.next());
+      button('Retry', res.success && res.next ? '' : 'big', () => this.actions.start());
+      button('Level select', '', () => this.actions.lobby());
+    } else {
+      button('Play again', 'big', () => this.actions.start());
+      button('Change settings', '', () => this.actions.lobby());
+    }
     $('.stars', R).innerHTML = res.success ? [1, 2, 3].map((i) => `<span class="${i <= res.stars ? 'on' : ''}">★</span>`).join('') : '';
-    $('.numbers', R).innerHTML = (res.early ? `<div class="early">Finished with ${fmtTime(Math.ceil(res.timeLeft))} to spare!</div>` : '') + `Height <b>${res.height.toFixed(1)} m</b> · finish line ${res.finish} m · ${res.pieces} piece${res.pieces === 1 ? '' : 's'} in the tower` +
+    $('.numbers', R).innerHTML = (res.early ? `<div class="early">Finished with ${fmtTime(Math.ceil(res.timeLeft))} to spare!</div>` : '') + `Height <b>${res.height.toFixed(1)} m</b> · finish line ${m1(res.finish)} m · ${res.pieces} piece${res.pieces === 1 ? '' : 's'} in the tower` +
       (res.success ? (res.stars < 3 ? `<div class="small">Next star at ${(res.finish * (res.stars === 1 ? 1.15 : 1.3)).toFixed(1)} m</div>` : '') : `<div class="small">${Math.max(0, res.finish - res.height).toFixed(1)} m short. So close… try again!</div>`);
     $('.awards', R).innerHTML = res.awards.map((a) => `<div class="award"><span class="title">${esc(a.title)}</span> ${esc(a.name)}</div>`).join('');
     const rows = res.players.sort((a, b) => b.placed - a.placed).map((p) => `<tr><td><span class="dot" style="background:${p.color}"></span>${esc(p.name)}</td><td>${p.placed}</td><td>${p.highest.toFixed(1)} m</td><td>${p.lost}</td></tr>`).join('');
@@ -321,6 +413,9 @@ export class Hud {
       case 'leave': this.feed(`${esc(e.name)} left`); break;
       case 'anchor': this.pop(r, e.x, e.y + 1.8, 'propped for 20 s', '#ffd95e'); break;
       case 'tie': this.feed('🎈 A balloon is holding something up'); break;
+      case 'glitch': { const c = game.sim.claws.get(e.slot); if (c) { const p = c.body.getPosition(); this.pop(r, p.x, p.y + 1, { slip: 'slip!', stretch: 'stretch!', drop: 'oops, dropped!' }[e.kind], '#ffb0b0'); } break; }
+      case 'boost': this.feed(`⚡ ${who(e.slot)} has a <b>Super Claw</b>!`); break;
+      case 'shatter': this.pop(r, e.x, e.y + 0.5, 'smash!', '#bff6ff'); break;
       default: break;
     }
   }

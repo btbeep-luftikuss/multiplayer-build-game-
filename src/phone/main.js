@@ -124,7 +124,7 @@ function onMessage(m) {
     case 'full': connState = 'full'; renderOverlay(); break;
     case 'st': onStatus(m); break;
     case 'inv': inv = m; renderCards(); break;
-    case 'cfg': cfg = m.settings; renderOverlay(); break;
+    case 'cfg': cfg = m.settings; lvInfo = m.lv || null; renderLeaderBar(); renderOverlay(); break;
     case 'toast': toast(m.text, m.big); break;
     case 'buzz': if (Array.isArray(m.p)) buzz(m.p.slice(0, 10)); break;
     case 'res': result = m; renderOverlay(); break;
@@ -141,7 +141,7 @@ function onStatus(s) {
   $('#pad .hgt').classList.toggle('over', s.h >= s.f);
   const state = $('#pad .claw-state');
   state.className = 'claw-state ' + ['open', 'closed', 'holding'][s.g];
-  state.innerHTML = s.g === 2 ? `✊ ${esc(s.hn)}` : s.g === 1 ? '✊ closed' : '✋ open';
+  state.innerHTML = (s.bo ? `⚡${s.bo} ` : '') + (s.g === 2 ? `✊ ${esc(s.hn)}` : s.g === 1 ? '✊ closed' : '✋ open');
   const grab = $('#pad .grab');
   grab.textContent = s.g === 2 ? 'LET GO' : s.g === 1 ? 'OPEN' : 'GRAB';
   grab.classList.toggle('holding', s.g === 2);
@@ -158,7 +158,7 @@ function onStatus(s) {
   else if (s.ph !== 'play' || !count.classList.contains('go')) count.className = '';
   $('#pad .inventory').classList.toggle('busy', !!s.sb);
   if (s.ph !== 'result') result = null;
-  if (!prev || prev.ph !== s.ph || prev.ld !== s.ld || prev.free !== s.free) { renderLeaderBar(); renderCards(); renderOverlay(); }
+  if (!prev || prev.ph !== s.ph || prev.ld !== s.ld || prev.free !== s.free || prev.lv !== s.lv) { renderLeaderBar(); renderCards(); renderOverlay(); }
 }
 
 function meter(sel, v) {
@@ -291,14 +291,16 @@ const SETTINGS = {
 };
 let menuOpen = false;
 let settingsOpen = false;
+let lvInfo = null;      // Levels mode: which levels there are, which are unlocked and done
 
 function renderLeaderBar() {
   const bar = $('#pad .leader-bar');
   if (!st) { bar.innerHTML = ''; return; }
   if (st.ph === 'lobby') {
-    bar.innerHTML = st.ld
-      ? `<button class="start">▶ START</button><button class="settings">⚙ Settings</button>`
-      : `<div class="wait">Warm up! The leader starts the round.</div>`;
+    const what = st.md === 'levels' && st.lv ? `<div class="lvname">${esc(st.lv)}</div>` : '';
+    bar.innerHTML = what + (st.ld
+      ? `<button class="start">▶ START</button><button class="settings">⚙ ${st.md === 'levels' ? 'Levels' : 'Settings'}</button>`
+      : `<div class="wait">Warm up! The leader starts the round.</div>`);
   } else bar.innerHTML = '';
   bar.querySelector('.start')?.addEventListener('click', () => send({ t: 'start' }));
   bar.querySelector('.settings')?.addEventListener('click', () => { settingsOpen = true; renderOverlay(); });
@@ -312,7 +314,25 @@ function renderOverlay() {
   else if (connState === 'offline') html = `<h2>Can't reach the internet</h2><p>Phones need Wi-Fi or data to find the TV. Still trying…</p><button data-act="code">Change the code</button>`;
   else if (connState === 'connecting' || connState === 'reconnecting' || (connState === 'open' && !me)) html = `<div class="spinner"></div><h2>${connState === 'reconnecting' ? 'Reconnecting…' : 'Connecting to the TV…'}</h2><button data-act="code">Change the code</button>`;
   else if (settingsOpen && st?.ld && cfg) {
-    html = '<h2>Settings</h2>' + Object.entries(SETTINGS).map(([k, s]) => `<div class="setting"><div class="t">${s.title}</div><div class="opts">${s.opts.map((v) => `<button class="${cfg[k] === v ? 'sel' : ''}" data-set="${k}" data-val='${JSON.stringify(v)}'>${s.show(v)}</button>`).join('')}</div></div>`).join('') + '<button class="big" data-act="close">Done</button>';
+    const mode = lvInfo?.mode || 'free';
+    html = `<h2>Game mode</h2><div class="setting"><div class="opts"><button class="${mode === 'free' ? 'sel' : ''}" data-mode="free">Free Play</button><button class="${mode === 'levels' ? 'sel' : ''}" data-mode="levels">Levels</button></div></div>`;
+    if (mode === 'levels' && lvInfo) {
+      html += '<div class="levels">' + lvInfo.list.map((l) => {
+        const locked = l.id > lvInfo.unlocked;
+        return `<button class="lv ${lvInfo.level === l.id ? 'sel' : ''} ${l.done ? 'done' : ''}" ${locked ? 'disabled' : ''} data-level="${l.id}"><b>${l.id}</b> ${locked ? '🔒' : l.icon} ${esc(l.name)}${l.done ? ` <span class="best">✓ ${l.best !== null ? fmtTime(l.best) : ''}</span>` : ''}</button>`;
+      }).join('') + `<button class="lv ${lvInfo.level === 'remix' ? 'sel' : ''}" ${lvInfo.remix ? '' : 'disabled'} data-level="remix">${lvInfo.remix ? '🎲' : '🔒'} Endless Remix${lvInfo.remix ? ` <span class="best">${lvInfo.remixWins} won</span>` : ' <span class="best">beat Level 10</span>'}</button></div>`;
+      html += '<button class="big" data-act="close">Done</button>';
+    } else html += '<h2>Settings</h2>' + Object.entries(SETTINGS).map(([k, s]) => `<div class="setting"><div class="t">${s.title}</div><div class="opts">${s.opts.map((v) => `<button class="${cfg[k] === v ? 'sel' : ''}" data-set="${k}" data-val='${JSON.stringify(v)}'>${s.show(v)}</button>`).join('')}</div></div>`).join('') + '<button class="big" data-act="close">Done</button>';
+  } else if (st?.ph === 'result' && result && result.lv) {
+    const L = result.lv;
+    html = `<h2 class="${result.ok ? 'win' : 'lose'}">${result.ok ? 'LEVEL COMPLETE!' : 'LEVEL FAILED'}</h2>` +
+      `<p>${L.id === 'remix' ? 'Endless Remix' : 'Level ' + L.id}: ${esc(L.name)}</p>` +
+      (result.ok ? `<p>in <b>${fmtTime(L.time)}</b>${L.best ? ' · <b>new best!</b>' : ''}</p>` : `<p>${result.h.toFixed(1)} m of ${result.f.toFixed(1)} m</p>`) +
+      (L.unlocked ? `<p class="awards">🔓 ${L.unlocked === 'remix' ? 'Endless Remix' : 'Level ' + L.unlocked} unlocked!</p>` : '') +
+      (st.ld
+        ? (result.ok && L.next ? `<button class="big" data-act="next">${L.next === 'remix' ? 'Endless Remix ▶' : 'Next level ▶'}</button><button data-act="again">Retry</button>` : `<button class="big" data-act="again">Retry</button>`) + `<button data-act="lobby">Level select</button>`
+        : `<p class="small">Waiting for the leader…</p>`) +
+      `<button data-act="hide">Smash the tower 😈</button>`;
   } else if (st?.ph === 'result' && result) {
     html = `<h2 class="${result.ok ? 'win' : 'lose'}">${result.ok ? 'THE TOWER STANDS!' : 'NOT TALL ENOUGH'}</h2>` +
       (result.ok ? `<div class="stars">${[1, 2, 3].map((i) => `<span class="${i <= result.stars ? 'on' : ''}">★</span>`).join('')}</div>` : '') +
@@ -336,8 +356,11 @@ $('#overlay').addEventListener('click', (e) => {
   const t = e.target.closest('button');
   if (!t) return;
   if (t.dataset.set) { send({ t: 'set', key: t.dataset.set, val: JSON.parse(t.dataset.val) }); cfg = { ...cfg, [t.dataset.set]: JSON.parse(t.dataset.val) }; renderOverlay(); return; }
+  if (t.dataset.mode) { send({ t: 'mode', m: t.dataset.mode }); if (lvInfo) lvInfo = { ...lvInfo, mode: t.dataset.mode }; renderOverlay(); return; }
+  if (t.dataset.level) { const id = t.dataset.level === 'remix' ? 'remix' : Number(t.dataset.level); send({ t: 'level', id }); if (lvInfo) lvInfo = { ...lvInfo, mode: 'levels', level: id }; renderOverlay(); return; }
   switch (t.dataset.act) {
     case 'retry': join(); break;
+    case 'next': send({ t: 'next' }); break;
     case 'code': link?.close(); link = null; me = null; connState = 'idle'; menuOpen = false; renderOverlay(); show('join'); break;
     case 'close': settingsOpen = false; menuOpen = false; renderOverlay(); break;
     case 'again': send({ t: 'start' }); break;

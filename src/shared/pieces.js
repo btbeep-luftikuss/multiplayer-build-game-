@@ -13,6 +13,8 @@ export const MATERIALS = {
   clay:     { density: 1.8,  friction: 0.9,  restitution: 0.02, color: '#e0674b', dark: '#b1462f', sound: 'stone' },
   candy:    { density: 0.8,  friction: 0.9,  restitution: 0.15, color: '#ff9ad5', dark: '#e46bb3', sound: 'soft' },
   gold:     { density: 2.4,  friction: 0.6,  restitution: 0.05, color: '#ffc93c', dark: '#d69a12', sound: 'metal' },
+  magN:     { density: 2.4,  friction: 0.7,  restitution: 0.02, color: '#ff5a5a', dark: '#c03030', sound: 'metal' },
+  magS:     { density: 2.4,  friction: 0.7,  restitution: 0.02, color: '#4f8dff', dark: '#2a5cc0', sound: 'metal' },
   // special pieces
   goo:      { density: 1.2,  friction: 1.5,  restitution: 0.0,  color: '#7dff5a', dark: '#3fc22a', sound: 'goo' },
   magnet:   { density: 2.6,  friction: 0.7,  restitution: 0.0,  color: '#ff4b4b', dark: '#c22424', sound: 'metal' },
@@ -87,6 +89,11 @@ export const SHAPES = {
   magnet:   { parts: [poly(rect(1.3, 0.7))], look: 'magnet' },
   balloon:  { parts: [circle(0.55)], look: 'balloon' },
   scaffold: { parts: [poly(rect(0.4, 3.2))], look: 'scaffold' },
+  // only ever an icon (the Super Claw power-up isn't a piece)
+  bolt: {
+    parts: [poly(rect(0.8, 1.6))],
+    outline: [[0.15, 0.8], [-0.45, -0.05], [-0.05, -0.05], [-0.2, -0.8], [0.45, 0.1], [0.05, 0.1]],
+  },
 };
 
 // the silhouette of a shape: { pts } for polygons, { r } for circles
@@ -154,14 +161,20 @@ export const PIECES = {
   'candy-post':   { shape: 'post', mat: 'candy', name: 'Candy Cane' },
   'candy-beam':   { shape: 'shortbeam', mat: 'candy', name: 'Wafer' },
   'candy-spire':  { shape: 'spire', mat: 'candy', name: 'Cone' },
+  // magnetic blocks (Levels mode): opposite poles pull together, the same push apart
+  'magn-cube':    { shape: 'cube', mat: 'magN', name: 'North Cube', pole: 1 },
+  'mags-cube':    { shape: 'cube', mat: 'magS', name: 'South Cube', pole: -1 },
+  'magn-bar':     { shape: 'shortbeam', mat: 'magN', name: 'North Bar', pole: 1 },
+  'mags-bar':     { shape: 'shortbeam', mat: 'magS', name: 'South Bar', pole: -1 },
   // special pieces (power-ups): handed out during a round
   'sp-goo':       { shape: 'goo', mat: 'goo', name: 'Sticky Goo', special: 'sticky', tip: 'Glues itself to every piece it touches' },
   'sp-magnet':    { shape: 'magnet', mat: 'magnet', name: 'Magnet', special: 'magnet', tip: 'Pulls nearby pieces in and holds them' },
   'sp-balloon':   { shape: 'balloon', mat: 'balloon', name: 'Balloon', special: 'balloon', tip: 'Ties onto a piece and lifts it' },
   'sp-scaffold':  { shape: 'scaffold', mat: 'scaffold', name: 'Support Beam', special: 'support', tip: 'Stand it on the ground: it props the tower up for 20 s' },
+  'sp-boost':     { shape: 'bolt', mat: 'gold', name: 'Super Claw', special: 'boost', tip: 'Tap it: for 20 s your claw is faster, reels quicker and grips harder', instant: true },
 };
 
-export const SPECIAL_IDS = ['sp-goo', 'sp-magnet', 'sp-balloon', 'sp-scaffold'];
+export const SPECIAL_IDS = ['sp-goo', 'sp-magnet', 'sp-balloon', 'sp-scaffold', 'sp-boost'];
 
 // one kit per player slot: [piece id, how many]
 export const KITS = [

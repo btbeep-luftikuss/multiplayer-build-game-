@@ -13,6 +13,25 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 - Once the tower has been over the finish line for **3 seconds**, a **5-second hold** starts: every claw lets go and pulls up, and the helpers vanish. If the tower is still over the line at the end, **everyone wins** right away. If it falls, the claws come back and you keep building.
 - When the clock hits zero the same check happens one last time. Build higher for 2 and 3 stars.
 
+### Levels mode
+
+Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play** to **Levels**: ten handcrafted challenges, each with its own time limit, height goal, pieces and mechanics. Beat a level to unlock the next. The level select shows which levels are done and the team's best time for each; progress is saved on the TV.
+
+| # | Level | What's new |
+|---|---|---|
+| 1 | Training Grounds | Flat ground, plenty of time, simple blocks |
+| 2 | Windy Heights | Gusts that change direction push the tower, harder the higher it gets |
+| 3 | Soft Ground | The base is springy jelly: heavy pieces sink where they land |
+| 4 | Rotating Platform | The base slowly rocks from side to side (in a side view, that's how it turns) |
+| 5 | Magnetic Blocks | Red N and blue S blocks: opposites pull together, same colours push apart |
+| 6 | Shrinking Time | Much less time, and lava rises up the sides, burning anything that touches it |
+| 7 | Dual Gravity Zones | Normal gravity on the left, floaty low gravity on the right |
+| 8 | Moving Target Line | The finish line drifts up and down; only the moment time runs out counts |
+| 9 | Unstable Claws | Grips slip and ropes stretch at random; glass shatters on hard hits |
+| 10 | Final Challenge | Wind, the rocking base, magnets and lava together, with the least time |
+
+Beating Level 10 opens the **Endless Remix**: a random mix of two or three of those mechanics, a little harder after every win. A new **Super Claw** power-up can turn up in any game: tap it on your phone and for 20 seconds your claw is faster, quicker on the rope, and grips harder without slipping.
+
 ### Phone controls
 
 | Control | What it does |
@@ -72,3 +91,4 @@ To try it on one computer without phones, open `http://localhost:8080/?local` (t
 - `src/phone/`: the controller.
 - `src/net/net.js`: [PeerJS](https://peerjs.com/) rooms (the TV hosts, phones connect), plus a same-computer mode for testing.
 - `src/shared/pieces.js`: all the pieces, materials and kits.
+- `src/shared/levels.js`: the ten levels and the remix: time, height, pieces and mechanics.

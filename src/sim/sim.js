@@ -2,12 +2,13 @@
 // player hanging from it on a rope, each player's spawn platform, and every building piece.
 // Built on planck.js (a JavaScript port of Box2D, chosen for stable stacking). The world is 2D;
 // the TV draws it in 3D. Units: metres, kilograms, seconds; y points up.
-import { World, Vec2, AABB, Box, Polygon, Circle, Transform, RopeJoint, RevoluteJoint, WeldJoint, testOverlap } from 'planck';
+import { World, Vec2, AABB, Box, Polygon, Circle, Transform, RopeJoint, RevoluteJoint, WeldJoint, PrismaticJoint, testOverlap } from 'planck';
 import { SHAPES, PIECES, MATERIALS, extentsOf } from '../shared/pieces.js';
 
 export const STEP = 1 / 60;
 export const GRAVITY = 10;
-const CAT = { STATIC: 0x1, PIECE: 0x2, CLAW: 0x4 };
+const CAT = { STATIC: 0x1, PIECE: 0x2, CLAW: 0x4, PAD: 0x8 };
+const SOLID = CAT.STATIC | CAT.PIECE | CAT.CLAW | CAT.PAD; // what pieces and claws bump into
 const DEG = Math.PI / 180;
 
 export const LAYOUT = {
@@ -24,11 +25,13 @@ export const LAYOUT = {
 // spawn shelves beyond it at the far left and right, alternating sides, as solid steps rising like
 // stairs towards the edges; each higher step starts 1.8 m further out, so the step below keeps 1.8 m
 // of open top for its pieces. The TV camera zooms out as far as the claws spread.
-export function makeLayout(topY, players) {
+// (Some levels raise everything: `lift` puts the pad up on a mesa and the shelves with it; a rocking
+// base is narrower, `padHalf`.)
+export function makeLayout(topY, players, { padHalf: padOverride = 0, lift = 0 } = {}) {
   const n = Math.max(2, players);
   const levels = Math.max(1, Math.ceil(n / 2));
   const step = 1.8;
-  const padHalf = 11 + n * 0.5;
+  const padHalf = padOverride || 11 + n * 0.5;
   const inner0 = padHalf + 1.4;
   const halfW = inner0 + (levels - 1) * step + LAYOUT.shelfW + 0.4;
   void topY;
@@ -41,7 +44,7 @@ export function makeLayout(topY, players) {
     slot(s) {
       const side = s % 2 === 0 ? -1 : 1, level = Math.floor(s / 2);
       const inner = inner0 + level * step;
-      return { side, level, top: 1.0 + level * 2.8, x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + 0.9) };
+      return { side, level, top: 1.0 + lift + level * 2.8, x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + 0.9) };
     },
   };
 }
@@ -85,6 +88,18 @@ function bodyTop(body) {
   return top;
 }
 
+// the lowest point of a body
+function bodyBottom(body) {
+  let low = Infinity;
+  const xf = body.getTransform();
+  for (let f = body.getFixtureList(); f; f = f.getNext()) {
+    const s = f.getShape();
+    if (s.getType() === 'circle') low = Math.min(low, Transform.mulVec2(xf, s.getCenter()).y - s.getRadius());
+    else for (let i = 0; i < s.m_count; i++) low = Math.min(low, Transform.mulVec2(xf, s.m_vertices[i]).y);
+  }
+  return low;
+}
+
 export class Piece {
   constructor(sim, type, owner, x, y, angle) {
     const def = PIECES[type];
@@ -114,7 +129,7 @@ export class Piece {
     for (const shape of makeShapes(def.shape)) {
       this.body.createFixture({
         shape, density: m.density, friction: m.friction, restitution: m.restitution,
-        filterCategoryBits: CAT.PIECE, filterMaskBits: CAT.STATIC | CAT.PIECE | CAT.CLAW,
+        filterCategoryBits: CAT.PIECE, filterMaskBits: SOLID,
       });
     }
     this.body.setUserData({ kind: 'piece', piece: this });
@@ -139,7 +154,7 @@ export class Claw {
     this.body.setUserData({ kind: 'claw', claw: this });
     this.hub = this.body.createFixture({
       shape: new Box(CLAW.hubHalfW, CLAW.hubHalfH, Vec2(0, CLAW.hubCy), 0), density: CLAW.density, friction: 0.6,
-      filterCategoryBits: CAT.CLAW, filterMaskBits: CAT.STATIC | CAT.PIECE | CAT.CLAW,
+      filterCategoryBits: CAT.CLAW, filterMaskBits: SOLID,
     });
     this.fist = null;
     this.ropeLen = startLen;
@@ -155,7 +170,12 @@ export class Claw {
     this.enabled = true;
     this.lastTension = 0;
     this.reeling = 0;        // how fast the rope is moving (for sound)
+    this.boostUntil = -1;    // the Super Claw power-up
+    this.slipUntil = -1;     // Unstable claws: the grip is weak for a moment
+    this.nextGlitch = sim.time + 4 + Math.random() * 6;
   }
+
+  get boosted() { return this.sim.time < this.boostUntil; }
 
   get x() { return this.trolley.getPosition().x; }
   get holding() { return this.hold ? this.hold.piece : null; }
@@ -183,10 +203,11 @@ export class Claw {
     const body = this.body;
     const load = this.loadMass();
     const inp = this.enabled ? this.input : { mx: 0, ry: 0 };
+    const boost = this.boosted ? 1.5 : 1;
     // trolley along the bar
-    const vmax = CLAW.vMax / (1 + load / 12);
+    const vmax = CLAW.vMax * boost / (1 + load / 12);
     const target = clamp(inp.mx, -1, 1) * vmax;
-    const accel = CLAW.accel * (Math.abs(target) < Math.abs(this.vx) ? 1.2 : 1);
+    const accel = CLAW.accel * boost * (Math.abs(target) < Math.abs(this.vx) ? 1.2 : 1);
     this.vx += clamp(target - this.vx, -accel * dt, accel * dt);
     const x = this.x;
     if ((x <= -sim.barLimit && this.vx < 0) || (x >= sim.barLimit && this.vx > 0)) {
@@ -202,7 +223,7 @@ export class Claw {
     else if (this.auto) {
       if (this.auto.mode === 'lower') rate = -CLAW.reelOut * 0.85;
       else if (this.auto.mode === 'raise') rate = CLAW.reelIn / (1 + load / 4);
-    } else if (inp.ry > 0) rate = inp.ry * CLAW.reelIn / (1 + load / 4);
+    } else if (inp.ry > 0) rate = inp.ry * CLAW.reelIn * boost * boost / (1 + load / 4);
     else rate = inp.ry * CLAW.reelOut;
     const dist = this.ropeDistance();
     const maxLen = this.maxRope();
@@ -232,6 +253,7 @@ export class Claw {
         this.rotHeldFor += dt;
         if (this.rotHeldFor > 0.35) h.target += this.rotHold * 1.8 * dt;
       }
+      h.joint.setMaxMotorTorque(CLAW.gripTorque * (this.boosted ? 2.5 : 1) * (sim.time < this.slipUntil ? 0.15 : 1));
       const err = h.target - h.joint.getJointAngle();
       h.joint.setMotorSpeed(clamp(CLAW.servoGain * err, -CLAW.servoMax, CLAW.servoMax));
       h.strain = Math.min(1, Math.abs(err) / 0.5);
@@ -279,7 +301,7 @@ export class Claw {
     if (on && !this.fist) {
       this.fist = this.body.createFixture({
         shape: new Polygon([Vec2(-0.3, -0.14), Vec2(0.3, -0.14), Vec2(0.12, -0.72), Vec2(-0.12, -0.72)]),
-        density: 1, friction: 0.6, filterCategoryBits: CAT.CLAW, filterMaskBits: CAT.STATIC | CAT.PIECE | CAT.CLAW,
+        density: 1, friction: 0.6, filterCategoryBits: CAT.CLAW, filterMaskBits: SOLID,
       });
     } else if (!on && this.fist) {
       this.body.destroyFixture(this.fist);
@@ -416,14 +438,23 @@ export class Claw {
 }
 
 export class Sim {
-  constructor({ finishHeight = 8, players = 2 } = {}) {
+  // mods: the level's mechanics (see shared/levels.js); none in free play
+  constructor({ finishHeight = 8, players = 2, mods = {} } = {}) {
     this.world = new World({ gravity: Vec2(0, -GRAVITY), allowSleep: true });
     this.time = 0;
     this.stepCount = 0;
+    this.mods = mods;
+    // some mechanics need the pad raised: a sinking jelly base, a rocking base on a pivot, a mesa above the lava
+    this.softTravel = mods.soft ? 0.75 : 0;
+    const lift = (mods.soft ? 0.8 : 0) + (mods.tilt ? 1.0 : 0) + (mods.lava ? 1.4 : 0);
+    this.padTop = LAYOUT.padTop + lift;
+    this.finishBase = finishHeight;
     this.finishHeight = finishHeight;
-    this.finishY = LAYOUT.padTop + finishHeight;
-    this.topY = this.finishY + 6.5;
-    this.layout = makeLayout(this.topY, players);
+    this.finishY = this.padTop + finishHeight;
+    this.lineAmp = mods.moveLine ? mods.moveLine.amp : 0;
+    this.lineFrozen = false;
+    this.topY = this.finishY + this.lineAmp + 6.5;
+    this.layout = makeLayout(this.topY, players, { lift, padHalf: mods.tilt ? 7 + players * 0.3 : 0 });
     this.barLimit = this.layout.halfW - 0.7;
     this.pieces = new Set();
     this.claws = new Map();      // slot -> Claw
@@ -434,23 +465,68 @@ export class Sim {
     this.towerLog = [];          // recent heights, for spotting collapses
     this.fallLog = [];           // pieces that recently fell off the tower
     this.lastCollapse = -99;
+    this.wind = 0;               // now: sideways push, m/s² at the finish line (+ is to the right)
+    this.tilt = 0;               // now: the rocking base's angle
+    // the lava: the game raises it over the round, up to just under the pad
+    this.lavaTop = this.padTop - 0.25 - this.softTravel - (mods.tilt ? Math.sin((mods.tilt.amp * Math.PI) / 180) * this.layout.padHalf : 0);
+    this.lavaY = mods.lava ? -0.6 : -Infinity;
 
     const ground = this.world.createBody({ type: 'static' });
     ground.createFixture({ shape: new Box(this.layout.groundHalf, 1, Vec2(0, -1), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
     ground.setUserData({ kind: 'ground' });
     this.ground = ground;
-    const pad = this.world.createBody({ type: 'static' });
-    pad.createFixture({ shape: new Box(this.layout.padHalf, LAYOUT.padTop / 2, Vec2(0, LAYOUT.padTop / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC });
-    pad.setUserData({ kind: 'pad' });
-    this.pad = pad;
+    this.buildPad();
 
     this.world.on('begin-contact', (c) => this.onBeginContact(c));
   }
 
+  // the build pad: a solid block, or springy jelly segments (soft), or a slab rocking on a pivot (tilt).
+  // padBodies: what the tower stands on, with their half sizes (the TV draws them).
+  buildPad() {
+    const half = this.layout.padHalf, top = this.padTop, mods = this.mods;
+    this.padBodies = [];
+    const add = (body, hw, hh, kind) => { body.setUserData({ kind: 'pad' }); this.padBodies.push({ body, hw, hh, kind }); return body; };
+    if (mods.tilt) {
+      const slab = this.world.createBody({ type: 'kinematic', position: Vec2(0, top - 0.2) });
+      slab.createFixture({ shape: new Box(half, 0.2), friction: 0.95, filterCategoryBits: CAT.PAD, filterMaskBits: CAT.PIECE | CAT.CLAW });
+      add(slab, half, 0.2, 'tilt');
+      // a solid base under the pivot, below the slab's reach
+      const base = this.world.createBody({ type: 'static' });
+      base.createFixture({ shape: new Box(0.8, (top - 1.0) / 2, Vec2(0, (top - 1.0) / 2), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+      base.setUserData({ kind: 'ground' });
+      this.pivot = { hw: 0.8, h: top - 1.0 };
+    } else if (mods.soft) {
+      const n = Math.max(4, Math.round((half * 2) / 1.6));
+      const w = (half * 2) / n;
+      if (top - 0.4 - this.softTravel > 0.05) {
+        // the box the jelly sits in
+        const tub = this.world.createBody({ type: 'static' });
+        const h = top - 0.4 - this.softTravel;
+        tub.createFixture({ shape: new Box(half, h / 2, Vec2(0, h / 2), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+        tub.setUserData({ kind: 'ground' });
+        this.tub = { hw: half, h };
+      }
+      for (let i = 0; i < n; i++) {
+        const x = -half + w * (i + 0.5);
+        const seg = this.world.createBody({ type: 'dynamic', position: Vec2(x, top - 0.2), fixedRotation: true, linearDamping: 0.5 });
+        seg.createFixture({ shape: new Box(w / 2 - 0.02, 0.2), density: 1, friction: 0.95, restitution: 0.35, filterCategoryBits: CAT.PAD, filterMaskBits: CAT.PIECE | CAT.CLAW });
+        seg.setSleepingAllowed(false);
+        this.world.createJoint(new PrismaticJoint({ enableLimit: true, lowerTranslation: -this.softTravel, upperTranslation: 0.05 }, this.ground, seg, Vec2(x, top - 0.2), Vec2(0, 1)));
+        add(seg, w / 2 - 0.02, 0.2, 'soft').__rest = top - 0.2;
+      }
+    } else {
+      const pad = this.world.createBody({ type: 'static' });
+      pad.createFixture({ shape: new Box(half, top / 2, Vec2(0, top / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC });
+      add(pad, half, top / 2, 'solid');
+    }
+    this.pad = this.padBodies[0].body;
+  }
+
   // moves the finish line (in the lobby, as players join); the top bar stays put until the next round
   setFinishHeight(h) {
+    this.finishBase = h;
     this.finishHeight = h;
-    this.finishY = LAYOUT.padTop + h;
+    this.finishY = this.padTop + h;
   }
 
   emit(ev) { this.events.push(ev); }
@@ -733,6 +809,10 @@ export class Sim {
     const va = a.getLinearVelocityFromWorldPoint(pt), vb = b.getLinearVelocityFromWorldPoint(pt);
     const speed = Math.abs((vb.x - va.x) * n.x + (vb.y - va.y) * n.y);
     if (speed < 1.1) return;
+    // fragile glass shatters when it hits (or is hit) hard
+    if (this.mods.fragile && speed > 3.6) {
+      for (const p of [pa, pb]) if (p && p.mat === 'glass' && !p.parked) this.queue.push(() => { if (!p.dead) { const q = p.body.getPosition(); this.removePiece(p, 'shatter'); this.emit({ type: 'shatter', x: q.x, y: q.y }); } });
+    }
     const now = this.time;
     if ((a.__hit ?? -1) > now - 0.1 || (b.__hit ?? -1) > now - 0.1) return;
     if (a.isDynamic()) a.__hit = now;
@@ -753,10 +833,12 @@ export class Sim {
     const queue = [];
     const ok = (p) => p && !p.dead && !p.heldBy.size && p.body.isDynamic() && p.special !== 'balloon' && p.body.getLinearVelocity().length() < 1.6;
     const pieceOf = (b) => { const ud = b.getUserData(); return ud?.kind === 'piece' ? ud.piece : null; };
-    for (let ce = this.pad.getContactList(); ce; ce = ce.next) {
-      if (!ce.contact.isTouching()) continue;
-      const p = pieceOf(ce.other);
-      if (ok(p) && !set.has(p)) { set.add(p); queue.push(p); }
+    for (const pb of this.padBodies) {
+      for (let ce = pb.body.getContactList(); ce; ce = ce.next) {
+        if (!ce.contact.isTouching()) continue;
+        const p = pieceOf(ce.other);
+        if (ok(p) && !set.has(p)) { set.add(p); queue.push(p); }
+      }
     }
     while (queue.length) {
       const p = queue.pop();
@@ -767,7 +849,7 @@ export class Sim {
       }
       for (const w of p.welds) if (ok(w.other) && !set.has(w.other)) { set.add(w.other); queue.push(w.other); }
     }
-    let top = null, topY = LAYOUT.padTop, sx = 0;
+    let top = null, topY = this.padTop, sx = 0;
     for (const p of set) {
       const t = p.top;
       sx += p.body.getWorldCenter().x;
@@ -778,7 +860,7 @@ export class Sim {
       if (!set.has(p) && !p.heldBy.size && !p.dead) this.fallLog.push({ t: this.time, id: p.id });
     }
     const prevCount = this.tower.count;
-    this.tower = { height: Math.max(0, topY - LAYOUT.padTop), count: set.size, top, set, x: set.size ? sx / set.size : 0, topY };
+    this.tower = { height: Math.max(0, topY - this.padTop), count: set.size, top, set, x: set.size ? sx / set.size : 0, topY };
 
     // collapse: a good part of a decent tower falling at once
     this.towerLog.push({ t: this.time, h: this.tower.height, n: set.size });
@@ -798,6 +880,7 @@ export class Sim {
 
   step(dt = STEP) {
     for (const claw of this.claws.values()) claw.preStep(dt);
+    this.stepMods(dt);
     this.stepSpecials();
     this.world.step(dt, 10, 6);
     const q = this.queue; this.queue = [];
@@ -808,8 +891,94 @@ export class Sim {
     if (this.stepCount % 6 === 0) this.slowStep();
   }
 
+  // the level's mechanics, every step
+  stepMods(dt) {
+    const m = this.mods, t = this.time;
+    // the finish line drifting up and down
+    if (this.lineAmp && !this.lineFrozen) {
+      this.finishHeight = this.finishBase + this.lineAmp * Math.sin((2 * Math.PI * t) / m.moveLine.period);
+      this.finishY = this.padTop + this.finishHeight;
+    }
+    // the base rocking from side to side
+    if (m.tilt) {
+      const A = (m.tilt.amp * Math.PI) / 180;
+      const want = A * Math.sin((2 * Math.PI * (t + dt)) / m.tilt.period);
+      const slab = this.padBodies[0].body;
+      slab.setLinearVelocity(Vec2(0, 0));
+      slab.setAngularVelocity((want - slab.getAngle()) / dt);
+      this.tilt = slab.getAngle();
+    }
+    // jelly: each segment of the base sits on its own spring (a heavy base sinks it about 0.2 m)
+    if (m.soft) {
+      for (const pb of this.padBodies) {
+        const b = pb.body;
+        const y = b.getPosition().y, vy = b.getLinearVelocity().y;
+        b.applyForceToCenter(Vec2(0, b.getMass() * GRAVITY + 140 * (b.__rest - y) - 28 * vy), true);
+      }
+    }
+    // wind: gusts that come and go and change direction, stronger higher up
+    if (m.wind) {
+      this.wind = m.wind.max * (0.55 * Math.sin(t * 0.21) + 0.3 * Math.sin(t * 0.57 + 1.3) + 0.15 * Math.sin(t * 1.7 + 0.4));
+      for (const p of this.pieces) {
+        if (p.dead || !p.body.isDynamic()) continue;
+        const k = clamp((p.body.getWorldCenter().y - this.padTop) / Math.max(2, this.finishHeight), 0.15, 1.3);
+        p.body.applyForceToCenter(Vec2(this.wind * k * p.mass, 0), true);
+      }
+      for (const c of this.claws.values()) c.body.applyForceToCenter(Vec2(this.wind * 0.4 * c.body.getMass(), 0), true);
+    }
+    // low gravity on the right half
+    if (m.gravity) {
+      const up = GRAVITY * (1 - m.gravity.right);
+      for (const p of this.pieces) if (!p.dead && p.body.isDynamic() && p.body.getWorldCenter().x > 0) p.body.applyForceToCenter(Vec2(0, up * p.mass), false);
+      for (const c of this.claws.values()) if (c.body.getPosition().x > 0) c.body.applyForceToCenter(Vec2(0, up * c.body.getMass()), true);
+    }
+    // magnetic blocks: opposite poles pull together, the same push apart
+    if (m.magnets) {
+      const mags = [];
+      for (const p of this.pieces) if (p.def.pole && !p.dead && p.body.isDynamic()) mags.push(p);
+      for (let i = 0; i < mags.length; i++) {
+        for (let j = i + 1; j < mags.length; j++) {
+          const a = mags[i], b = mags[j];
+          const pa = a.body.getWorldCenter(), pb = b.body.getWorldCenter();
+          const dx = pb.x - pa.x, dy = pb.y - pa.y, d = Math.hypot(dx, dy);
+          if (d > 3.2 || d < 0.01) continue;
+          // (strong enough up close to slide a block over, but a block stacked on its own pole only gets light)
+          const f = Math.min(22, 30 / Math.max(0.75, d) ** 2) * (a.def.pole * b.def.pole < 0 ? 1 : -1);
+          a.body.applyForceToCenter(Vec2((dx / d) * f, (dy / d) * f), true);
+          b.body.applyForceToCenter(Vec2((-dx / d) * f, (-dy / d) * f), true);
+        }
+      }
+    }
+    // unstable claws: now and then a grip slips (or lets go), or a rope stretches
+    if (m.unstable) {
+      for (const c of this.claws.values()) {
+        if (!c.enabled || t < c.nextGlitch) continue;
+        c.nextGlitch = t + m.unstable.min + Math.random() * (m.unstable.max - m.unstable.min);
+        if (c.boosted) continue;
+        const r = Math.random();
+        if (c.hold && r < m.unstable.drop) { c.release(); this.emit({ type: 'glitch', slot: c.slot, kind: 'drop' }); }
+        else if (c.hold && r < 0.6) { c.slipUntil = t + 1.2; this.emit({ type: 'glitch', slot: c.slot, kind: 'slip' }); }
+        else {
+          c.ropeLen = Math.min(c.maxRope(), c.ropeLen + 0.5 + Math.random() * 0.6);
+          c.rope.setMaxLength(c.ropeLen);
+          this.emit({ type: 'glitch', slot: c.slot, kind: 'stretch' });
+        }
+      }
+    }
+  }
+
   slowStep() {
     this.measureTower();
+    // the lava burns whatever reaches down into it
+    if (this.lavaY > -Infinity) {
+      for (const p of [...this.pieces]) {
+        if (!p.dead && !p.parked && bodyBottom(p.body) < this.lavaY) {
+          const pos = p.body.getPosition();
+          this.removePiece(p, 'burn');
+          this.emit({ type: 'burn', x: pos.x, y: this.lavaY });
+        }
+      }
+    }
     for (const p of [...this.pieces]) {
       const pos = p.body.getPosition();
       if (pos.y < LAYOUT.killY || Math.abs(pos.x) > this.layout.groundHalf + 10) { this.removePiece(p, 'lost'); continue; }
@@ -819,7 +988,7 @@ export class Sim {
         if (age > 8) p.releasedAt = -1;
         else if (this.tower.set.has(p) && p.body.getLinearVelocity().length() < 0.25 && Math.abs(p.body.getAngularVelocity()) < 0.4 && age > 0.25) {
           p.locked = true;
-          this.emit({ type: 'lock', piece: p.id, slot: p.releasedBy, top: p.top - LAYOUT.padTop, x: pos.x, y: pos.y, mat: p.mat });
+          this.emit({ type: 'lock', piece: p.id, slot: p.releasedBy, top: p.top - this.padTop, x: pos.x, y: pos.y, mat: p.mat });
         }
       }
       if (p.special === 'support' && p.armed) {

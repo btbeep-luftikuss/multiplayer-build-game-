@@ -152,7 +152,7 @@ export function materialTexture(kind, color) {
   const key = kind + color;
   if (cache.has(key)) return cache.get(key);
   const [c, g] = canvas(256);
-  (painters[kind] || painters.rubber)(g, 256, color, rng(kind.length * 97 + 13));
+  (painters[kind] || (kind === 'magN' || kind === 'magS' ? painters.metal : painters.rubber))(g, 256, color, rng(kind.length * 97 + 13));
   const t = finish(c, kind === 'crate' ? 1 / 1.4 : 1);
   cache.set(key, t);
   return t;
@@ -280,6 +280,25 @@ export function balloonStripes() {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   cache.set('hab', t);
+  return t;
+}
+
+// a white letter on a coloured disc (magnetic blocks: N and S)
+export function letterTexture(letter) {
+  const key = 'letter' + letter;
+  if (cache.has(key)) return cache.get(key);
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(255,255,255,0.9)';
+  g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2); g.fill();
+  g.fillStyle = letter === 'N' ? '#c03030' : '#2a5cc0';
+  g.font = '900 96px "Baloo 2", system-ui, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(letter, 64, 70);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set(key, t);
   return t;
 }
 
