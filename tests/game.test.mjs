@@ -57,6 +57,15 @@ ok(a.inv[0].n === a.inv[0].max && g.sim.pieces.size === 0, 'fresh kits, fresh wo
 run(g, 3.1 + 20 + 4.2);
 ok(g.phase === 'result' && !g.result.success, 'no tower: the round fails');
 
+console.log('Back to the lobby');
+{
+  const simBefore = g.sim;
+  g.toLobby();
+  ok(g.phase === 'lobby' && g.sim !== simBefore && g.sim.claws.size === 2, 'a fresh lobby world with every claw');
+  ok(g.setSetting('difficulty', 'hard') && g.sim.finishHeight === finishHeightFor(2, 'hard'), 'settings can change there, and the finish line follows');
+  g.setSetting('difficulty', 'normal');
+}
+
 console.log('Power-ups and refills');
 g.settings.roundTime = 120;
 g.startRound();
