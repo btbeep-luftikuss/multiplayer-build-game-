@@ -12,6 +12,8 @@ export const SETTING_CHOICES = {
 };
 const COUNTDOWN = 3;
 const JUDGE_TIME = 4;
+const OVER_TIME = 3;          // the tower over the line this long starts the hold check…
+const HOLD_TIME = 5;          // …which it has to survive, hands off, to win early
 const DROP_AFTER = 45;       // a player gone this long loses their claw
 
 // how high the finish line is, above the build pad
@@ -92,7 +94,7 @@ export class Game {
   placePlayer(p) {
     p.present = true;
     this.sim.addPlayer(p.slot);
-    this.claw(p).enabled = this.phase !== 'judge';
+    this.claw(p).enabled = this.canAct();
     if (this.phase === 'lobby') this.refreshLobbyLine();
   }
 
@@ -147,7 +149,7 @@ export class Game {
 
   rotateEnd(id) { const c = this.claw(this.players.get(id)); if (c) c.rotateEnd(); }
 
-  canAct() { return this.phase !== 'judge'; }
+  canAct() { return this.phase !== 'judge' && this.phase !== 'hold'; }
   canSpawn() { return this.phase === 'lobby' || this.phase === 'play'; }
 
   spawn(id, index, angle = 0) {
@@ -243,8 +245,8 @@ export class Game {
   setPhase(phase) {
     this.phase = phase;
     this.phaseT = 0;
-    const judging = phase === 'judge';
-    for (const c of this.sim.claws.values()) c.enabled = !judging;
+    const handsOff = phase === 'judge' || phase === 'hold';
+    for (const c of this.sim.claws.values()) c.enabled = !handsOff;
     this.emit({ type: 'phase', phase });
   }
 
@@ -258,16 +260,21 @@ export class Game {
       const now = Math.ceil(COUNTDOWN - this.phaseT);
       if (now !== before && now > 0) this.emit({ type: 'count', n: now });
       if (this.phaseT >= COUNTDOWN) { this.setPhase('play'); this.emit({ type: 'go' }); }
-    } else if (this.phase === 'play') {
+    } else if (this.phase === 'play' || this.phase === 'hold') {
       const before = Math.ceil(this.timeLeft);
       this.timeLeft = Math.max(0, this.timeLeft - dt);
       const now = Math.ceil(this.timeLeft);
       if (now !== before && now <= 10 && now > 0) this.emit({ type: 'tick', n: now });
       if (now !== before && (now === 60 || now === 30)) this.emit({ type: 'warn', n: now });
-      if (this.timeLeft <= 0) {
+      if (this.phase === 'hold') this.stepHold(dt);
+      else if (this.timeLeft <= 0) {
         this.sim.removeAids();
         this.setPhase('judge');
         this.emit({ type: 'timeup' });
+      } else {
+        // over the line for 3 s in a row: hands off, and see if it stands for 5 s
+        this.overT = this.sim.tower.height >= this.sim.finishHeight ? (this.overT || 0) + dt : 0;
+        if (this.overT >= OVER_TIME) this.startHold();
       }
     } else if (this.phase === 'judge') {
       if (this.phaseT >= JUDGE_TIME) this.finishRound();
@@ -353,7 +360,31 @@ export class Game {
     this.emit(e);
   }
 
-  finishRound() {
+  startHold() {
+    this.overT = 0;
+    this.holdFallT = 0;
+    this.sim.removeAids();
+    this.setPhase('hold');
+    this.emit({ type: 'hold', n: HOLD_TIME });
+  }
+
+  stepHold(dt) {
+    const before = Math.ceil(HOLD_TIME - (this.phaseT - dt));
+    const now = Math.ceil(HOLD_TIME - this.phaseT);
+    if (now !== before && now > 0) this.emit({ type: 'holdcount', n: now });
+    // fell below the line (for more than a moment): back to building, if there's time left
+    this.holdFallT = this.sim.tower.height < this.sim.finishHeight - 0.05 ? this.holdFallT + dt : 0;
+    if (this.holdFallT > 0.3) {
+      this.emit({ type: 'holdfail', height: this.sim.tower.height });
+      if (this.timeLeft <= 0) { this.finishRound(); return; }
+      this.crossed = false;
+      this.setPhase('play');
+      return;
+    }
+    if (this.phaseT >= HOLD_TIME) this.finishRound(true);
+  }
+
+  finishRound(early = false) {
     const height = this.sim.tower.height;
     const finish = this.sim.finishHeight;
     const success = height >= finish;
@@ -371,7 +402,7 @@ export class Game {
       top('grabs', 'Grabby Hands', 3);
       top('lost', 'Butterfingers');
     }
-    this.result = { success, height, finish, stars, best: this.best, pieces: this.sim.tower.count, players, awards, round: this.round };
+    this.result = { success, height, finish, stars, best: this.best, pieces: this.sim.tower.count, players, awards, round: this.round, early: early && success, timeLeft: this.timeLeft };
     this.setPhase('result');
     this.emit({ type: 'result', result: this.result });
   }
@@ -394,7 +425,7 @@ export class Game {
       t: 'st',
       ph: this.phase,
       tl: Math.ceil(this.timeLeft),
-      cd: this.phase === 'countdown' ? Math.max(1, Math.ceil(COUNTDOWN - this.phaseT)) : 0,
+      cd: this.phase === 'countdown' ? Math.max(1, Math.ceil(COUNTDOWN - this.phaseT)) : this.phase === 'hold' ? Math.max(1, Math.ceil(HOLD_TIME - this.phaseT)) : 0,
       h: Math.round(this.sim.tower.height * 10) / 10,
       f: this.sim.finishHeight,
       g: !c ? 0 : c.state === 'holding' ? 2 : c.state === 'closed' ? 1 : 0,

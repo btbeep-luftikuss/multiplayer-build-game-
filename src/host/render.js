@@ -933,7 +933,7 @@ export class Renderer {
     }
     let w = (x1 - x0) / share;
     let cx = (x0 + x1) / 2 + w * (1 - share) / 2;
-    if (game.phase === 'judge' && sim.tower.count) {
+    if ((game.phase === 'judge' || game.phase === 'hold') && sim.tower.count) {
       // time's up: lean in on the tower
       const k = clamp(game.phaseT / 1.2, 0, 1) * 0.35;
       cx = lerp(cx, sim.tower.x, k);

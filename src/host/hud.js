@@ -150,7 +150,7 @@ export class Hud {
     const timer = $('#timer', this.root);
     const t = phase === 'lobby' ? game.settings.roundTime : phase === 'countdown' ? game.settings.roundTime : game.timeLeft;
     $('.t', timer).textContent = fmtTime(Math.ceil(t));
-    $('.sub', timer).textContent = phase === 'lobby' ? 'warm-up' : phase === 'judge' ? 'hold it…' : phase === 'result' ? 'round over' : '';
+    $('.sub', timer).textContent = phase === 'lobby' ? 'warm-up' : phase === 'judge' || phase === 'hold' ? 'hold it…' : phase === 'result' ? 'round over' : '';
     timer.classList.toggle('hurry', phase === 'play' && game.timeLeft <= 30);
     timer.classList.toggle('panic', phase === 'play' && game.timeLeft <= 10);
 
@@ -255,7 +255,7 @@ export class Hud {
     R.classList.toggle('win', res.success);
     $('.verdict', R).innerHTML = res.success ? 'THE TOWER STANDS!' : res.height < 0.5 ? 'NO TOWER…' : 'NOT TALL ENOUGH';
     $('.stars', R).innerHTML = res.success ? [1, 2, 3].map((i) => `<span class="${i <= res.stars ? 'on' : ''}">★</span>`).join('') : '';
-    $('.numbers', R).innerHTML = `Height <b>${res.height.toFixed(1)} m</b> · finish line ${res.finish} m · ${res.pieces} piece${res.pieces === 1 ? '' : 's'} in the tower` +
+    $('.numbers', R).innerHTML = (res.early ? `<div class="early">Finished with ${fmtTime(Math.ceil(res.timeLeft))} to spare!</div>` : '') + `Height <b>${res.height.toFixed(1)} m</b> · finish line ${res.finish} m · ${res.pieces} piece${res.pieces === 1 ? '' : 's'} in the tower` +
       (res.success ? (res.stars < 3 ? `<div class="small">Next star at ${(res.finish * (res.stars === 1 ? 1.15 : 1.3)).toFixed(1)} m</div>` : '') : `<div class="small">${Math.max(0, res.finish - res.height).toFixed(1)} m short. So close… try again!</div>`);
     $('.awards', R).innerHTML = res.awards.map((a) => `<div class="award"><span class="title">${esc(a.title)}</span> ${esc(a.name)}</div>`).join('');
     const rows = res.players.sort((a, b) => b.placed - a.placed).map((p) => `<tr><td><span class="dot" style="background:${p.color}"></span>${esc(p.name)}</td><td>${p.placed}</td><td>${p.highest.toFixed(1)} m</td><td>${p.lost}</td></tr>`).join('');
@@ -301,7 +301,10 @@ export class Hud {
       case 'go': this.banner('BUILD!', 'go', 1.3); break;
       case 'warn': this.banner(e.n === 60 ? '1 minute left' : '30 seconds!', 'warn', 1.6); break;
       case 'timeup': this.banner("TIME'S UP!<div class='small'>Hands off… will it stand?</div>", 'timeup', 3.6); break;
-      case 'crossed': this.banner('OVER THE LINE!<div class="small">Now keep it standing until the end</div>', 'good', 2.6); break;
+      case 'crossed': this.banner('OVER THE LINE!<div class="small">Keep it there…</div>', 'good', 2.4); break;
+      case 'hold': this.banner(`${e.n}<div class="small">Hands off! Will it stand?</div>`, 'count', 1); break;
+      case 'holdcount': this.banner(`${e.n}<div class="small">Hands off! Will it stand?</div>`, 'count', 1); break;
+      case 'holdfail': this.banner(game.phase === 'play' ? 'IT FELL!<div class="small">Keep building!</div>' : 'IT FELL!', 'bad', 2.2); break;
       case 'uncrossed': this.feed('⚠️ The tower dropped below the line!'); break;
       case 'collapse': this.banner('COLLAPSE!', 'bad', 1.8); break;
       case 'powerup':

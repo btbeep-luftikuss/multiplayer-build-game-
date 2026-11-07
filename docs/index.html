@@ -24,7 +24,7 @@
   var small = Math.min(screen.width, screen.height) < 820;
   var phone = q.has('join') || q.has('phone') || (!q.has('tv') && touch && small);
   var s = document.createElement('script');
-  s.src = (phone ? 'phone.js' : 'tv.js') + '?v=cd5d38ed56';
+  s.src = (phone ? 'phone.js' : 'tv.js') + '?v=1f50a55391';
   s.onerror = function () { document.getElementById('boot').textContent = 'Could not load the game. Check your connection and reload.'; };
   document.body.appendChild(s);
   window.addEventListener('error', function (e) {

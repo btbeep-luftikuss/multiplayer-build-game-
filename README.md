@@ -10,7 +10,8 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 - **Tap a piece** on your phone to get it. It appears on your shelf, one at a time: pick it up before you take the next.
 - Swing it over to the build pad and **let go**. Pieces stack, slide, tip and topple, all fully simulated.
 - Grab anything, anywhere: your pieces, other people's, even pieces already in the tower. Two claws can lift a heavy base together.
-- When the clock hits zero, every claw lets go and the helpers vanish. If the tower is still standing over the finish line a few seconds later, **everyone wins**. Build higher for 2 and 3 stars.
+- Once the tower has been over the finish line for **3 seconds**, a **5-second hold** starts: every claw lets go and pulls up, and the helpers vanish. If the tower is still over the line at the end, **everyone wins** right away. If it falls, the claws come back and you keep building.
+- When the clock hits zero the same check happens one last time. Build higher for 2 and 3 stars.
 
 ### Phone controls
 

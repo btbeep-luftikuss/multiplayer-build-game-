@@ -275,6 +275,9 @@ export class Sound {
       case 'tick': this.tick(e.n); break;
       case 'warn': this.warn(); if (e.n === 30) this.fast = true; break;
       case 'timeup': this.timeup(); this.drumroll(); break;
+      case 'hold': this.warn(); this.drumroll(4.8); break;
+      case 'holdcount': this.tick(e.n); break;
+      case 'holdfail': this.crash(); break;
       case 'collapse': this.crash(); break;
       case 'crossed': this.powerup(); break;
       case 'result': if (e.result.success) this.win(); else this.fail(); break;

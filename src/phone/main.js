@@ -135,7 +135,7 @@ function onMessage(m) {
 function onStatus(s) {
   const prev = st;
   st = s;
-  $('#pad .clock').textContent = s.ph === 'lobby' ? 'warm-up' : s.ph === 'judge' ? 'hands off!' : fmtTime(s.tl);
+  $('#pad .clock').textContent = s.ph === 'lobby' ? 'warm-up' : s.ph === 'judge' || s.ph === 'hold' ? 'hands off!' : fmtTime(s.tl);
   $('#pad .clock').classList.toggle('hurry', s.ph === 'play' && s.tl <= 30);
   $('#pad .hgt').innerHTML = `<b>${s.h.toFixed(1)}</b>/${s.f} m`;
   $('#pad .hgt').classList.toggle('over', s.h >= s.f);
@@ -152,6 +152,7 @@ function onStatus(s) {
   // big numbers for the countdown
   const count = $('#count');
   if (s.ph === 'countdown') { count.textContent = s.cd; count.className = 'show'; }
+  else if (s.ph === 'hold') { count.innerHTML = `${s.cd}<small>hands off!</small>`; count.className = 'show hold'; }
   else if (prev?.ph === 'countdown' && s.ph === 'play') { count.textContent = 'GO!'; count.className = 'show go'; setTimeout(() => { if (st.ph === 'play') count.className = ''; }, 900); }
   else if (s.ph !== 'play' || !count.classList.contains('go')) count.className = '';
   $('#pad .inventory').classList.toggle('busy', !!s.sb);
@@ -314,7 +315,7 @@ function renderOverlay() {
   } else if (st?.ph === 'result' && result) {
     html = `<h2 class="${result.ok ? 'win' : 'lose'}">${result.ok ? 'THE TOWER STANDS!' : 'NOT TALL ENOUGH'}</h2>` +
       (result.ok ? `<div class="stars">${[1, 2, 3].map((i) => `<span class="${i <= result.stars ? 'on' : ''}">★</span>`).join('')}</div>` : '') +
-      `<p>${result.h.toFixed(1)} m of ${result.f} m · you placed ${result.placed} piece${result.placed === 1 ? '' : 's'}</p>` +
+      (result.early ? `<p><b>Finished with ${fmtTime(result.left)} to spare!</b></p>` : '') + `<p>${result.h.toFixed(1)} m of ${result.f} m · you placed ${result.placed} piece${result.placed === 1 ? '' : 's'}</p>` +
       (result.awards.length ? `<p class="awards">${result.awards.map((a) => `🏅 ${esc(a)}`).join('<br>')}</p>` : '') +
       (st.ld ? `<button class="big" data-act="again">Play again</button><button data-act="lobby">Change settings</button>` : `<p class="small">Waiting for the leader to play again…</p>`) +
       `<button data-act="hide">Smash the tower 😈</button>`;

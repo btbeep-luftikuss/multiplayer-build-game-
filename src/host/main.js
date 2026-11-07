@@ -148,7 +148,7 @@ function sendSettings(p) {
 function resultFor(p) {
   const r = game.result;
   const me = r.players.find((x) => x.slot === p.slot);
-  return { t: 'res', ok: r.success, h: r.height, f: r.finish, stars: r.stars, placed: me?.placed || 0, awards: r.awards.filter((a) => a.slot === p.slot).map((a) => a.title) };
+  return { t: 'res', ok: r.success, early: r.early, left: Math.ceil(r.timeLeft), h: r.height, f: r.finish, stars: r.stars, placed: me?.placed || 0, awards: r.awards.filter((a) => a.slot === p.slot).map((a) => a.title) };
 }
 
 const BUZZ = { grab: [25, 30, 25], miss: [70], release: [15], lock: [10, 25, 10] };
@@ -160,7 +160,8 @@ function relay(e) {
   if (e.type === 'powerup') { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: [40, 60, 40, 60, 120] }); }
   const all = (msg) => { for (const p of game.players.values()) if (p.connected) net.send(p.id, msg); };
   if (e.type === 'go') all({ t: 'buzz', p: [200] });
-  if (e.type === 'timeup') all({ t: 'buzz', p: [300] });
+  if (e.type === 'timeup' || e.type === 'hold') all({ t: 'buzz', p: [300] });
+  if (e.type === 'holdfail') all({ t: 'buzz', p: [150, 80, 150] });
   if (e.type === 'collapse') all({ t: 'buzz', p: [150, 80, 150] });
   if (e.type === 'result') for (const p of game.players.values()) if (p.connected) { net.send(p.id, resultFor(p)); net.send(p.id, { t: 'buzz', p: e.result.success ? [50, 50, 50, 50, 250] : [500] }); }
 }

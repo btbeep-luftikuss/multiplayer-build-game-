@@ -52,14 +52,34 @@ ok(g.spawn('aa', 0, 0) && a.inv[0].n === before - 2, 'and the next piece can com
 // build a tower over the line, straight onto the pad
 const finish = g.sim.finishHeight;
 const n = Math.ceil(finish + 1);
-for (let i = 0; i < n; i++) g.sim.createPiece('stone-cube', 0, 0, LAYOUT.padTop + 0.5 + i, 0);
+const tower = [];
+for (let i = 0; i < n; i++) tower.push(g.sim.createPiece('stone-cube', 0, 0, LAYOUT.padTop + 0.5 + i, 0));
 run(g, 2);
 ok(g.drainEvents().some((e) => e.type === 'crossed'), 'crossing the line is announced');
-run(g, 18.2);
-ok(g.phase === 'judge', 'time up: judging');
+run(g, 1.5);
+ok(g.phase === 'hold', 'over the line for 3 s: the hold check starts');
 ok([...g.sim.claws.values()].every((c) => !c.enabled && c.state === 'open'), 'the claws let go and stop');
+// knock it down during the hold: back to building
+tower[1].body.applyLinearImpulse({ x: 40, y: 0 }, tower[1].body.getWorldCenter(), true);
+run(g, 3);
+ok(g.drainEvents().some((e) => e.type === 'holdfail') && g.phase === 'play', 'it falls: everyone keeps building');
+ok([...g.sim.claws.values()].every((c) => c.enabled), 'with their claws back');
+for (const p of [...g.sim.pieces]) g.sim.removePiece(p, 'test');
+for (let i = 0; i < n; i++) g.sim.createPiece('stone-cube', 0, 0, LAYOUT.padTop + 0.5 + i, 0);
+run(g, 4);
+ok(g.phase === 'hold', 'over the line again: another hold');
+run(g, 5.2);
+ok(g.phase === 'result' && g.result.success && g.result.early, `it stands for 5 s: an early win with ${Math.ceil(g.result.timeLeft)} s to spare, ${g.result.stars} star(s)`);
+
+console.log('Time up');
+g.startRound();
+run(g, 3.1);
+for (let i = 0; i < 3; i++) g.sim.createPiece('stone-cube', 0, 0, LAYOUT.padTop + 0.5 + i, 0);
+g.timeLeft = 1;
+run(g, 1.2);
+ok(g.phase === 'judge', 'time up: judging');
 run(g, 4.2);
-ok(g.phase === 'result' && g.result.success, `the tower stands: ${g.result.height.toFixed(1)} m of ${g.result.finish} m, ${g.result.stars} star(s)`);
+ok(g.phase === 'result' && !g.result.success && !g.result.early, 'too short at the end: the round fails');
 
 console.log('Again, and a failure');
 ok(g.startRound(), 'play again');
