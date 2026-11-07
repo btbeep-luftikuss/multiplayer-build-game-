@@ -26,7 +26,13 @@ const canvas = document.getElementById('view');
 
 let quality = params.get('quality') || store.get('quality') || 'high';
 const game = new Game({ settings: store.get('settings') || undefined });
-let renderer = new Renderer(canvas, { quality });
+let renderer;
+try {
+  renderer = new Renderer(canvas, { quality });
+} catch (err) {
+  document.body.innerHTML = `<div class="nogl"><h1>This screen can't show the game</h1><p>Its browser can't draw 3D graphics (WebGL). Try Chrome, Edge, Firefox or Safari on a computer or a streaming stick connected to the TV.</p><p class="small">${String(err && err.message || err).replace(/[<>&]/g, '')}</p></div>`;
+  throw err;
+}
 const sound = new Sound();
 sound.setMuted(!!store.get('muted'));
 sound.setMusic(store.get('music') !== false);
@@ -100,7 +106,7 @@ const net = createHost({
   },
   onMessage: (cid, m) => onPhone(cid, m),
   onLeave: (cid) => game.setConnected(cid, false),
-  onStatus: (s) => { document.body.dataset.net = s; },
+  onStatus: (s) => { document.body.dataset.net = s; hud.setNet(s); },
 });
 
 function onPhone(cid, m) {

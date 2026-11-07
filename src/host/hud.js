@@ -66,6 +66,7 @@ export class Hud {
             <div class="step small">or open <b class="url"></b></div>
             <div class="step">2. Room code</div>
             <div class="bigcode"></div>
+            <div class="net">Connecting to the internet…</div>
           </div>
         </div>
         <h2>Players <span class="count"></span></h2>
@@ -124,6 +125,13 @@ export class Hud {
     $('#lobby .bigcode', this.root).textContent = code;
     $('#join-chip .code', this.root).textContent = code;
     $('#join-chip .url', this.root).textContent = pretty;
+  }
+
+  // is the room reachable? (phones need the TV registered with the matchmaking server)
+  setNet(state) {
+    const n = $('#lobby .net', this.root);
+    n.className = 'net ' + state;
+    n.textContent = state === 'ready' ? '' : state === 'offline' ? 'No internet: phones can\'t join yet. Retrying…' : 'Connecting to the internet…';
   }
 
   setSoundHint(show) { $('#sound-hint', this.root).classList.toggle('show', show); }

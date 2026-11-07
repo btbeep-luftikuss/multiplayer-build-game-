@@ -174,7 +174,8 @@ export class Claw {
     // rope: reel in (ry > 0) or let out (ry < 0); the DROP button lowers on its own
     let rate = 0;
     if (this.auto && Math.abs(inp.ry) > 0.35) this.auto = null; // taking over by hand
-    if (this.auto) {
+    if (!this.enabled) rate = CLAW.reelIn; // hands off (time's up): every claw pulls clear of the tower
+    else if (this.auto) {
       if (this.auto.mode === 'lower') rate = -CLAW.reelOut * 0.85;
       else if (this.auto.mode === 'raise') rate = CLAW.reelIn / (1 + load / 4);
     } else if (inp.ry > 0) rate = inp.ry * CLAW.reelIn / (1 + load / 4);

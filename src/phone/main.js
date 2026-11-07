@@ -120,6 +120,7 @@ function onMessage(m) {
       $('#pad .nm').textContent = m.name;
       connState = 'open';
       renderOverlay();
+      toast(`You're the ${m.colorName} claw! ${m.icon} ${m.kit} kit`);
       break;
     case 'full': connState = 'full'; renderOverlay(); break;
     case 'st': onStatus(m); break;

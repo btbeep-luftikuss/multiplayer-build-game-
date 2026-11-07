@@ -106,6 +106,10 @@ body.tv { cursor: default; user-select: none; -webkit-user-select: none; }
 #lobby .how .step { font-size: 2vh; font-weight: 700; line-height: 1.3; }
 #lobby .how .url { word-break: break-all; }
 #lobby .bigcode { font-size: 7vh; font-weight: 800; letter-spacing: 1vh; line-height: 1; margin-top: 0.4vh; }
+#lobby .net { font-size: 1.7vh; font-weight: 700; color: #b06000; }
+#lobby .net.offline { color: var(--bad); }
+#lobby .net.ready { display: none; }
+.nogl { max-width: 720px; margin: 15vh auto; padding: 0 24px; color: #fff; text-align: center; font-size: 20px; }
 #lobby .players { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.6vh; }
 #lobby .players li { display: flex; align-items: center; gap: 0.8vh; background: #fff; border: 0.3vh solid var(--ink); border-radius: 1.2vh; padding: 0.2vh 1vh; font-size: 1.9vh; line-height: 1.3; font-weight: 700; min-width: 0; flex-wrap: wrap; }
 #lobby .players li.empty { opacity: 0.4; border-style: dashed; }
