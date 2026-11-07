@@ -133,6 +133,26 @@ console.log('Rotate a held piece');
   ok(Math.abs(p.body.getAngle() - claw.body.getAngle() - Math.PI / 4) < 0.06, 'the other button turns it back');
 }
 
+console.log('An off-centre grab on a heavy girder slips; a centred one holds');
+{
+  for (const [offset, expectSlip] of [[1.4, true], [0, false]]) {
+    const sim = new Sim({ finishHeight: 8 });
+    const claw = sim.addPlayer(1);
+    run(sim, 0.5);
+    const g = sim.createPiece('metal-girder', 1, claw.x + offset, LAYOUT.platformTop + 0.25, 0);
+    run(sim, 1);
+    claw.drop();
+    run(sim, 8, () => (claw.state === 'holding' && !claw.auto ? false : undefined));
+    claw.input.ry = 1;
+    run(sim, 1.2);
+    claw.input.ry = 0;
+    run(sim, 1.5);
+    const tilt = Math.abs(g.body.getAngle());
+    console.log(`   offset ${offset} m: holding ${claw.hold?.piece === g}, tilt ${(tilt * 180 / Math.PI).toFixed(0)}°`);
+    ok(claw.hold?.piece === g && (expectSlip ? tilt > 0.35 : tilt < 0.1), expectSlip ? 'held by the end, it swings down in the grip' : 'held in the middle, it stays level');
+  }
+}
+
 console.log('Turntable: rotate a piece sitting on the platform');
 {
   const sim = new Sim({ finishHeight: 8 });

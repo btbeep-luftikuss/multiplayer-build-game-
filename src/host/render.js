@@ -399,8 +399,15 @@ export class Renderer {
     ]);
     box.position.set(x, LAYOUT.platformTop / 2, 0);
     box.castShadow = box.receiveShadow = true;
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.05, 32), this.toon(color, { transparent: true, opacity: 0.5 }));
+    // the turntable (it spins when a piece on it is turned)
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.05, 32), new THREE.MeshToonMaterial({ color, gradientMap: this.ramp, transparent: true, opacity: 0.5 }));
     disc.position.set(x, LAYOUT.platformTop + 0.03, 0);
+    for (const a of [0, Math.PI / 2]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.02, 0.12), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }));
+      bar.rotation.y = a;
+      bar.position.y = 0.03;
+      disc.add(bar);
+    }
     group.add(box, disc);
     if (this.outlines) {
       const o = new THREE.Mesh(hullOf(box.geometry), this.ink());
@@ -588,6 +595,7 @@ export class Renderer {
         this.puff(e.x, e.y, { n: 10, color: '#fff3a0', size: 0.13, speed: 3.5, life: 0.5 });
         break;
       }
+      case 'turn': { const pv = this.platformViews.get(e.slot); if (pv) pv.spin = 1; const v = view(e.piece); if (v) v.wobble = 0.6; break; }
       case 'remove': this.puff(e.x, e.y, { n: 14, color: e.reason === 'pop' ? MATERIALS.balloon.color : '#ffffff', size: 0.3, speed: 3 }); break;
       case 'weld': this.puff(e.x, e.y, { n: 10, color: e.special === 'magnet' ? '#9fd4ff' : MATERIALS.goo.color, size: 0.16, speed: 2.5 }); break;
       case 'clamp': { const v = view(e.piece); if (v) { v.wobble = 1; v.flash = 1; } break; }
@@ -624,6 +632,7 @@ export class Renderer {
       if (!sim.platforms.has(slot) || !p || p.name !== v.name) { this.scene.remove(v.group); this.platformViews.delete(slot); }
     }
     for (const slot of sim.platforms.keys()) if (!this.platformViews.has(slot)) this.platformViews.set(slot, this.makePlatformView(slot, playerBySlot.get(slot)));
+    for (const v of this.platformViews.values()) if (v.spin > 0) { v.spin = Math.max(0, v.spin - dt * 2.5); v.disc.rotation.y += dt * 9 * v.spin; v.disc.material.opacity = 0.5 + 0.4 * v.spin; }
 
     // pieces
     for (const [id, v] of this.pieceViews) if (v.piece.dead || !sim.pieces.has(v.piece)) this.removePieceView(id);

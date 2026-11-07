@@ -56,6 +56,7 @@ Phones and the TV find each other through PeerJS's free public server, then talk
 npm install
 npm run dev      # rebuilds on change, serves http://localhost:8080
 npm test         # physics and game-rule checks in Node
+node tests/browser.cjs   # optional: plays through the TV and two phones in Chromium (needs Playwright and the dev server)
 npm run build    # bundles into docs/ (commit docs/ so GitHub Pages serves it)
 ```
 

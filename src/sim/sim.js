@@ -30,7 +30,7 @@ export const CLAW = {
   density: 4,
   vMax: 6.5, accel: 9,       // trolley speed along the bar (m/s, m/s²)
   reelIn: 4.5, reelOut: 6, minRope: 0.9,
-  gripTorque: 140,           // how hard the claw holds a piece's angle before it slips
+  gripTorque: 80,            // how hard the claw holds a piece's angle before it slips (heavy + off-centre = slips)
   servoGain: 12, servoMax: 5,
   gyroK: 55, gyroD: 11, gyroMax: 80, // keeps the claw upright (it still tilts under off-centre loads)
   sway: 0.6,                 // damping ratio of the swing relative to the trolley

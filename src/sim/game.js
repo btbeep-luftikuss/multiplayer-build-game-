@@ -156,8 +156,12 @@ export class Game {
     angle = Number.isFinite(angle) ? Math.round(angle / (Math.PI / 4)) * (Math.PI / 4) : 0;
     const claw = this.claw(p);
     let piece = null;
-    if (this.settings.spawnInClaw && claw && !claw.hold) piece = this.sim.spawnInClaw(p.slot, item.id, angle);
-    if (!piece) piece = this.sim.spawnOnPlatform(p.slot, item.id, angle);
+    const tryClaw = this.settings.spawnInClaw && claw && !claw.hold;
+    if (tryClaw) piece = this.sim.spawnInClaw(p.slot, item.id, angle);
+    if (!piece) {
+      piece = this.sim.spawnOnPlatform(p.slot, item.id, angle);
+      if (piece && tryClaw) this.toast(p, 'No room under your claw: it\'s on your platform');
+    }
     if (!piece) { this.toast(p, 'Your platform is full: move something off it'); return false; }
     if (free) this.tidyLobby();
     else {

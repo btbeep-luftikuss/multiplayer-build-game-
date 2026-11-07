@@ -287,7 +287,7 @@ export class Hud {
     const who = (slot) => { const p = bySlot(slot); return p ? `<b style="color:${p.color}">${esc(p.name)}</b>` : 'Someone'; };
     switch (e.type) {
       case 'phase':
-        if (e.phase === 'countdown') this.banner('3', 'count', 1);
+        if (e.phase === 'countdown') { this.banner('3', 'count', 1); this.lockedTop = 0; }
         if (e.phase === 'lobby') this.lastResult = null;
         break;
       case 'count': this.banner(String(e.n), 'count', 1); break;
@@ -300,7 +300,13 @@ export class Hud {
       case 'powerup':
         this.feed(`${e.rescue ? '🚑 Rescue! ' : '🎁 '}${who(e.slot)} got a <b>${esc(PIECES[e.piece].name)}</b>`);
         break;
-      case 'lock': if (e.top > 0) this.pop(r, e.x, e.y + 0.6, 'clunk!', '#fff6a8'); break;
+      case 'lock':
+        // a piece that raised the tower gets a "+0.8 m"
+        if (game.phase === 'play' && e.top > (this.lockedTop || 0) + 0.05) {
+          this.pop(r, e.x, e.y + 0.7, `+${(e.top - (this.lockedTop || 0)).toFixed(1)} m`, '#7dff9e');
+          this.lockedTop = e.top;
+        } else this.pop(r, e.x, e.y + 0.6, 'clunk!', '#fff6a8');
+        break;
       case 'join': this.feed(`👋 ${who(e.slot)} joined`); break;
       case 'leave': this.feed(`${esc(e.name)} left`); break;
       case 'anchor': this.pop(r, e.x, e.y + 1.8, 'propped for 20 s', '#ffd95e'); break;

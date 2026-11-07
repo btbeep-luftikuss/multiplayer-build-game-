@@ -70,9 +70,9 @@ body.tv { cursor: default; user-select: none; -webkit-user-select: none; }
 #pops .pop { position: absolute; transform: translate(-50%, -50%); font-weight: 800; font-size: 2.6vh; -webkit-text-stroke: 0.25vh var(--ink); paint-order: stroke fill; animation: rise 1.3s ease-out forwards; white-space: nowrap; }
 @keyframes rise { 0% { opacity: 0; transform: translate(-50%, -20%) scale(0.6); } 15% { opacity: 1; transform: translate(-50%, -60%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -260%) scale(1); } }
 
-#ui[data-phase=lobby] #feed { left: calc(34vw + 5vh); }
-#feed { position: absolute; left: 2vh; bottom: 2vh; display: flex; flex-direction: column; gap: 0.8vh; max-width: 40vw; }
-#feed .item { background: rgba(255, 250, 240, 0.94); border: 0.35vh solid var(--ink); border-radius: 1.4vh; padding: 0.3vh 1.4vh; font-size: 2.2vh; font-weight: 600; transition: opacity 1s; }
+#ui[data-phase=lobby] #feed { left: calc(34vw + 5vh); top: 2vh; }
+#feed { position: absolute; left: 2vh; top: 15vh; display: flex; flex-direction: column; align-items: flex-start; gap: 0.6vh; max-width: 36vw; }
+#feed .item { background: rgba(255, 250, 240, 0.92); border: 0.3vh solid var(--ink); border-radius: 1.2vh; padding: 0.1vh 1.2vh; font-size: 1.9vh; font-weight: 600; transition: opacity 1s; }
 #feed .item.fade { opacity: 0; }
 
 #join-chip { position: absolute; left: 2vh; top: 1.6vh; display: none; align-items: center; gap: 1.2vh; background: var(--paper); border: 0.4vh solid var(--ink); border-radius: 1.6vh; padding: 0.8vh 1.4vh 0.8vh 0.8vh; }
