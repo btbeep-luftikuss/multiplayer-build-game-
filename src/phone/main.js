@@ -428,6 +428,8 @@ addEventListener('keyup', (e) => {
 });
 addEventListener('blur', () => { if (keysDown.size) { keysDown.clear(); keyInput(); } });
 if (matchMedia('(pointer: fine)').matches) document.body.classList.add('has-keys');
+// a touch-screen computer: a bigger controller, for fingers
+if ((navigator.maxTouchPoints || 0) > 0 || matchMedia('(any-pointer: coarse)').matches) document.body.classList.add('touch-big');
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
 show('join');

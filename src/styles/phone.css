@@ -168,5 +168,6 @@ body.has-keys .keys-hint { display: block; }
 /* on a computer screen: keep the controller a comfortable width, in the middle */
 @media (min-width: 760px) and (min-height: 600px) {
   #pad.show { left: 50%; right: auto; width: 560px; transform: translateX(-50%); }
+  body.touch-big #pad.show { width: min(760px, 96vw); }
   body.phone { background: #120c22; }
 }

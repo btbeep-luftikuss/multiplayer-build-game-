@@ -36,6 +36,8 @@ Beating Level 10 opens the **Endless Remix**: a random mix of two or three of th
 
 A computer can be a controller too. In the TV lobby, **💻 Use this computer as a controller too** opens a controller in a new tab (the TV keeps running in the first one); the TV's ☰ menu can also switch the screen over to a controller. Any computer can open the game's address with `?join=CODE`, or with `?phone` to type the code in. On a computer: arrow keys or WASD move the claw and the rope, Space grabs, X drops, Q/E turn, and 1–9 take a piece (the mouse works on the pad and buttons too).
 
+Touch-screen computers and tablets ask when the game opens: **Show the game on this screen** or **Use this screen as a controller**. The controller works by touch there just like on a phone (it's drawn bigger on a large touch screen), and the keyboard and mouse work too.
+
 ### Phone controls
 
 | Control | What it does |
