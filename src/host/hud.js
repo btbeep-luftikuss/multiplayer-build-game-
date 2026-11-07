@@ -31,7 +31,6 @@ const SETTING_LABELS = {
   roundTime: { title: 'Round time', show: (v) => fmtTime(v) },
   difficulty: { title: 'Finish line', show: (v) => ({ easy: 'Low', normal: 'Medium', hard: 'High' }[v]) },
   powerups: { title: 'Power-ups', show: (v) => (v ? 'On' : 'Off') },
-  spawnInClaw: { title: 'New pieces', show: (v) => (v ? 'Into the claw' : 'On the platform') },
 };
 
 export class Hud {

@@ -16,10 +16,10 @@ export const LAYOUT = {
   groundHalf: 23,
   barHalf: 22.6,
   shelfW: 3,
-  shelfThick: 0.45,
   killY: -8,
-  // Spawn shelves out at the far left and right, alternating sides, stacked like stairs: each
-  // higher shelf sits 1.8 m further out, so a claw can still reach down past it to the one below.
+  // Spawn shelves out at the far left and right, alternating sides: solid steps rising like stairs
+  // towards the edges. Each higher step starts 1.8 m further out, so the step below keeps 1.8 m of
+  // open top for its pieces.
   // x0/x1: the shelf's inner and outer ends; x: where new pieces arrive (the part a claw can reach).
   slot(s) {
     const side = s % 2 === 0 ? -1 : 1, level = Math.floor(s / 2);
@@ -440,15 +440,10 @@ export class Sim {
     if (this.claws.has(slot)) return this.claws.get(slot);
     const L = LAYOUT.slot(slot);
     const plat = this.world.createBody({ type: 'static' });
-    const t = LAYOUT.shelfThick;
+    // a solid step from the ground up (the higher steps, further out, overlap its outer part)
     plat.createFixture({
-      shape: new Box(LAYOUT.shelfW / 2, t / 2, Vec2((L.x0 + L.x1) / 2, L.top - t / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC,
+      shape: new Box(LAYOUT.shelfW / 2, L.top / 2, Vec2((L.x0 + L.x1) / 2, L.top / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC,
     });
-    // the post holding the shelf up, at its outer end
-    const postH = L.top - t;
-    if (postH > 0.05) {
-      plat.createFixture({ shape: new Box(0.15, postH / 2, Vec2(L.x1 - L.side * 0.2, postH / 2), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
-    }
     plat.setUserData({ kind: 'platform', slot });
     this.platforms.set(slot, plat);
     const claw = new Claw(this, slot, L.x);
@@ -519,13 +514,27 @@ export class Sim {
     const shape = PIECES[type].shape;
     const e = extentsOf(shape, angle);
     const L = LAYOUT.slot(slot);
-    for (const lift of [0, 1.1, 2.2]) {
-      for (const dx of [0, -0.75 * L.side, 0.75 * L.side]) {
-        const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.04 - e.y0 + lift;
-        if (!this.blocked(shape, x, y, angle)) return this.createPiece(type, slot, x, y, angle);
+    for (const dx of [0, -0.5 * L.side, 0.5 * L.side]) {
+      const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.04 - e.y0;
+      if (!this.blocked(shape, x, y, angle)) {
+        const p = this.createPiece(type, slot, x, y, angle);
+        p.waiting = true;
+        return p;
       }
     }
     return null;
+  }
+
+  // is the player's last new piece still waiting on their shelf? (grabbed, or gone from the shelf, frees it)
+  shelfBusy(slot) {
+    const L = LAYOUT.slot(slot);
+    for (const p of this.pieces) {
+      if (!p.waiting || p.owner !== slot) continue;
+      const pos = p.body.getPosition();
+      if (p.dead || p.heldBy.size || Math.abs(pos.x - L.x) > 2.6 || pos.y < L.top - 0.5 || pos.y > L.top + 4) p.waiting = false;
+      else return true;
+    }
+    return false;
   }
 
   // spin the newest loose piece sitting on a player's platform (the platform is a turntable)

@@ -4,12 +4,11 @@ import { Sim, STEP } from './sim.js';
 import { KITS, PIECES, SPECIAL_IDS, PLAYER_COLORS } from '../shared/pieces.js';
 
 export const MAX_PLAYERS = 8;
-export const DEFAULT_SETTINGS = { roundTime: 240, difficulty: 'normal', powerups: true, spawnInClaw: true };
+export const DEFAULT_SETTINGS = { roundTime: 240, difficulty: 'normal', powerups: true };
 export const SETTING_CHOICES = {
   roundTime: [120, 180, 240, 300, 360],
   difficulty: ['easy', 'normal', 'hard'],
   powerups: [true, false],
-  spawnInClaw: [true, false],
 };
 const COUNTDOWN = 3;
 const JUDGE_TIME = 4;
@@ -31,7 +30,8 @@ const kitInventory = (slot) => KITS[slot % KITS.length].items.map(([id, n]) => (
 
 export class Game {
   constructor({ settings, random = Math.random } = {}) {
-    this.settings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+    this.settings = { ...DEFAULT_SETTINGS };
+    for (const k of Object.keys(SETTING_CHOICES)) if (settings && SETTING_CHOICES[k].includes(settings[k])) this.settings[k] = settings[k];
     this.random = random;
     this.players = new Map(); // id -> player
     this.phase = 'lobby';     // lobby | countdown | play | judge | result
@@ -154,15 +154,10 @@ export class Game {
     const free = this.phase === 'lobby';
     if (!free && item.n <= 0) { this.toast(p, `No ${PIECES[item.id].name} left`); return false; }
     angle = Number.isFinite(angle) ? Math.round(angle / (Math.PI / 4)) * (Math.PI / 4) : 0;
-    const claw = this.claw(p);
-    let piece = null;
-    const tryClaw = this.settings.spawnInClaw && claw && !claw.hold;
-    if (tryClaw) piece = this.sim.spawnInClaw(p.slot, item.id, angle);
-    if (!piece) {
-      piece = this.sim.spawnOnPlatform(p.slot, item.id, angle);
-      if (piece && tryClaw) this.toast(p, 'No room under your claw: it\'s on your platform');
-    }
-    if (!piece) { this.toast(p, 'Your platform is full: move something off it'); return false; }
+    // one at a time: the last piece has to leave the shelf before the next one arrives
+    if (this.sim.shelfBusy(p.slot)) { this.toast(p, 'Take your last piece off your shelf first'); return false; }
+    const piece = this.sim.spawnOnPlatform(p.slot, item.id, angle);
+    if (!piece) { this.toast(p, 'No room on your shelf: clear it first'); return false; }
     if (free) this.tidyLobby();
     else {
       item.n--;
@@ -400,6 +395,7 @@ export class Game {
       tn: c ? Math.round(c.tension() * 100) / 100 : 0,
       sn: hold ? Math.round(hold.strain * 100) / 100 : 0,
       au: !!c?.auto,
+      sb: this.sim.shelfBusy(p.slot),
       ld: this.isLeader(id),
       free: this.phase === 'lobby',
       n: this.activeCount,

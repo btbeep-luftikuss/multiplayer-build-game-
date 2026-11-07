@@ -64,10 +64,16 @@ const ok = (cond, msg) => { console.log(`${cond ? '  ok ' : 'FAIL '} ${msg}`); i
   const claw = (slot) => tv.evaluate((s) => { const c = window.__claw.game.sim.claws.get(s); return { x: c.x, state: c.state }; }, slot);
 
   await ana.locator('.cards .card').nth(0).click();
-  await tv.waitForFunction(() => window.__claw.game.sim.claws.get(0).state === 'holding', null, { timeout: 5000 });
-  ok(true, 'tapping a piece puts it in the claw');
+  await tv.waitForFunction(() => window.__claw.game.sim.pieces.size === 1, null, { timeout: 5000 });
+  ok(true, 'tapping a piece puts it on the shelf');
+  await ana.waitForSelector('.inventory.busy');
+  ok(true, 'and the phone says to pick it up before the next one');
+  await tap(ana, '.buttons .drop');
+  await tv.waitForFunction(() => { const c = window.__claw.game.sim.claws.get(0); return c.state === 'holding' && !c.auto; }, null, { timeout: 20000 });
+  ok(true, 'DROP lowers the claw onto the shelf and grabs the piece');
+  await drag(ana, '.stick.rope', 0, -80, 900);
   const x0 = (await claw(0)).x;
-  await drag(ana, '.stick.move', 80, 0, 900);
+  await drag(ana, '.stick.move', 80, 0, 1600);
   ok((await claw(0)).x > x0 + 1, 'the MOVE pad moves the claw');
   await sleep(1500);
   await tap(ana, '.buttons .drop');

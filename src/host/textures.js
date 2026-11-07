@@ -200,6 +200,89 @@ export function dotsTexture() {
   return t;
 }
 
+// the far backdrop: snowy mountains and a pastel city skyline, on a transparent sky
+export function backdropTexture() {
+  if (cache.has('backdrop')) return cache.get('backdrop');
+  const W = 2048, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const r = rng(21);
+  // mountains
+  const peaks = [];
+  for (let x = -100; x < W + 200; x += 150 + r() * 120) peaks.push([x, 210 + r() * 90]);
+  const mg = g.createLinearGradient(0, 120, 0, H);
+  mg.addColorStop(0, '#b3bdee'); mg.addColorStop(1, '#d6e0f7');
+  g.fillStyle = mg;
+  g.beginPath(); g.moveTo(-100, H);
+  for (let i = 0; i < peaks.length; i++) {
+    const [x, y] = peaks[i];
+    const nx = peaks[i + 1] ? peaks[i + 1][0] : x + 200;
+    g.lineTo(x, y); g.lineTo((x + nx) / 2, y + 90 + r() * 40);
+  }
+  g.lineTo(W + 200, H); g.closePath(); g.fill();
+  g.fillStyle = '#ffffff';
+  for (const [x, y] of peaks) {
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x - 34, y + 40); g.lineTo(x - 14, y + 34); g.lineTo(x, y + 46); g.lineTo(x + 16, y + 32); g.lineTo(x + 34, y + 40); g.closePath(); g.fill();
+  }
+  // the city
+  const pastel = ['#f7c6c7', '#c6dcf7', '#f7e3b0', '#cbe8c4', '#e0cff2', '#f6d3b8', '#bfe4ea'];
+  let x = 0;
+  while (x < W) {
+    const w = 30 + r() * 50, h = 40 + r() * 90;
+    const top = H - 110 - h;
+    const color = pastel[Math.floor(r() * pastel.length)];
+    g.fillStyle = color; g.fillRect(x, top, w, h + 110);
+    g.fillStyle = 'rgba(0,0,0,0.08)'; g.fillRect(x + w - 8, top, 8, h + 110);
+    // windows
+    g.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let wy = top + 12; wy < H - 120; wy += 18) for (let wx = x + 8; wx < x + w - 14; wx += 14) if (r() > 0.25) g.fillRect(wx, wy, 7, 9);
+    // a roof thing now and then
+    if (r() < 0.3) { g.fillStyle = '#8a8fb0'; g.fillRect(x + w / 2 - 2, top - 26, 4, 26); }
+    else if (r() < 0.3) { g.fillStyle = '#b07a4f'; g.fillRect(x + 10, top - 16, 18, 16); }
+    x += w + 2 + r() * 8;
+  }
+  // far green hills in front of the city
+  g.fillStyle = '#a9dcb8';
+  g.beginPath(); g.moveTo(0, H);
+  for (let hx = 0; hx <= W; hx += 16) g.lineTo(hx, H - 95 + Math.sin(hx / 90) * 18 + Math.sin(hx / 37) * 6);
+  g.lineTo(W, H); g.closePath(); g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  cache.set('backdrop', t);
+  return t;
+}
+
+// a soft round glow (for the sun)
+export function glowTexture() {
+  if (cache.has('glow')) return cache.get('glow');
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 8, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,248,200,0.9)'); grad.addColorStop(0.4, 'rgba(255,240,180,0.35)'); grad.addColorStop(1, 'rgba(255,240,180,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('glow', t);
+  return t;
+}
+
+// rainbow stripes for the hot-air balloon
+export function balloonStripes() {
+  if (cache.has('hab')) return cache.get('hab');
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 16;
+  const g = c.getContext('2d');
+  const cols = ['#ff4d5e', '#ffc928', '#3d8bff', '#2fd27a', '#ff8a2b', '#a46bff', '#ff6bcb', '#1fd6d0'];
+  cols.forEach((col, i) => { g.fillStyle = col; g.fillRect(i * 32, 0, 32, 16); });
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('hab', t);
+  return t;
+}
+
 export function grassTexture() {
   if (cache.has('grass')) return cache.get('grass');
   const [c, g] = canvas(256);

@@ -7,7 +7,7 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 ## How to play
 
 - Everyone has a **claw** hanging on a rope from the bar at the top of the screen, and their own **spawn shelf** out at the edge of the field (shelves stack up like stairs on both sides, leaving the middle for building), stocked with a kit of pieces nobody else has (wood, stone, steel, toys, ice, bricks, junk, candy).
-- **Tap a piece** on your phone to get it. It appears straight in your claw if there's room under it (or on your platform; you can change this in the settings).
+- **Tap a piece** on your phone to get it. It appears on your shelf, one at a time: pick it up before you take the next.
 - Swing it over to the build pad and **let go**. Pieces stack, slide, tip and topple, all fully simulated.
 - Grab anything, anywhere: your pieces, other people's, even pieces already in the tower. Two claws can lift a heavy base together.
 - When the clock hits zero, every claw lets go and the helpers vanish. If the tower is still standing over the finish line a few seconds later, **everyone wins**. Build higher for 2 and 3 stars.
@@ -38,7 +38,7 @@ Balloons and support beams go away when time runs out: the tower has to stand on
 
 ### Settings (TV lobby, or the leader's phone)
 
-Round time (2–6 minutes), finish line height (low, medium, high; it also rises with more players), power-ups on or off, and whether new pieces arrive in the claw or on the platform.
+Round time (2–6 minutes), finish line height (low, medium, high; it also rises with more players), power-ups on or off.
 
 ## Putting it online (GitHub Pages)
 

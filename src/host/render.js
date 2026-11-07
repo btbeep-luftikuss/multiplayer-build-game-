@@ -145,57 +145,147 @@ export class Renderer {
     c.width = 4; c.height = 256;
     const g = c.getContext('2d');
     const grad = g.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, '#5bb8ff'); grad.addColorStop(0.55, '#a8dcff'); grad.addColorStop(1, '#fff1d6');
+    grad.addColorStop(0, '#3fa4ff'); grad.addColorStop(0.5, '#93d2ff'); grad.addColorStop(0.85, '#d6efff'); grad.addColorStop(1, '#fff0d4');
     g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
     const sky = new THREE.CanvasTexture(c);
     sky.colorSpace = THREE.SRGBColorSpace;
     this.scene.background = sky;
 
     const back = new THREE.Group();
-    // far hills and a skyline: soft, low-contrast, so the play area stands out
-    const hillMat = [this.toon('#7cc7a4'), this.toon('#93d6b0'), this.toon('#6db897')];
-    for (let i = 0; i < 9; i++) {
-      const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), hillMat[i % 3]);
-      const z = -70 - (i % 3) * 25;
-      hill.scale.set(30 + (i * 37) % 25, 9 + (i * 13) % 8, 10);
-      hill.position.set(-110 + i * 28, -4, z);
-      back.add(hill);
+    const flat = (color, opts = {}) => new THREE.MeshBasicMaterial({ color, ...opts });
+
+    // the far backdrop, painted: snowy mountains and a pastel city skyline
+    const bd = new THREE.Mesh(new THREE.PlaneGeometry(900, 120), new THREE.MeshBasicMaterial({ map: TX.backdropTexture(), transparent: true, depthWrite: false }));
+    bd.position.set(0, 35, -240);
+    back.add(bd);
+
+    // the sun, with a soft glow
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ map: TX.glowTexture(), transparent: true, depthWrite: false }));
+    glow.position.set(70, 62, -235);
+    const sun = new THREE.Mesh(new THREE.CircleGeometry(8, 40), flat('#fff3a6'));
+    sun.position.set(70, 62, -234);
+    back.add(glow, sun);
+
+    // rolling hills in two layers (bluer far away), the nearer one dotted with trees
+    const hill = (z, base, amp, color, seed) => {
+      const pts = [new THREE.Vector2(-320, -30)];
+      for (let x = -320; x <= 320; x += 8) pts.push(new THREE.Vector2(x, base + amp * (Math.sin(x / 37 + seed) * 0.6 + Math.sin(x / 13 + seed * 2) * 0.25 + Math.sin(x / 71 + seed * 3) * 0.5)));
+      pts.push(new THREE.Vector2(320, -30));
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), flat(color));
+      m.position.z = z;
+      back.add(m);
+      return (x) => base + amp * (Math.sin(x / 37 + seed) * 0.6 + Math.sin(x / 13 + seed * 2) * 0.25 + Math.sin(x / 71 + seed * 3) * 0.5);
+    };
+    hill(-150, 3, 5, '#b4dfd0', 1.3);
+    const midY = hill(-95, 0, 4, '#9ed6ad', 2.1);
+    const nearY = hill(-55, -3, 2.5, '#88cd95', 0.4);
+    // trees: round toon crowns on little trunks (instanced: one draw call each)
+    const N = 90;
+    const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), this.toon('#ffffff'), N);
+    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.35, 1, 6), this.toon('#8a5a36'), N);
+    const greens = ['#5cb877', '#6cc485', '#52ad70', '#78cc8c', '#5fb88a'];
+    const col = new THREE.Color();
+    for (let i = 0; i < N; i++) {
+      const near = i % 3 !== 0;
+      const z = near ? -55 + 1 : -95 + 1;
+      const x = -240 + ((i * 97) % 480) + Math.sin(i * 7.3) * 6;
+      const y = (near ? nearY(x) : midY(x)) - 0.8;
+      const s = (near ? 1.5 : 2.2) * (0.8 + ((i * 37) % 10) / 20);
+      tmpM.compose(tmpP.set(x, y + s * 1.6, z), tmpQ.identity(), tmpS.set(s, s * 1.15, s));
+      crowns.setMatrixAt(i, tmpM);
+      crowns.setColorAt(i, col.set(greens[i % greens.length]));
+      tmpM.compose(tmpP.set(x, y + s * 0.5, z - 0.3), tmpQ.identity(), tmpS.set(s * 0.5, s, s * 0.5));
+      trunks.setMatrixAt(i, tmpM);
     }
-    const cityMat = this.toon('#a9c4e0');
-    for (let i = 0; i < 26; i++) {
-      const w = 4 + (i * 7) % 6, h = 8 + (i * 29) % 22;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 4), cityMat);
-      b.position.set(-130 + i * 10.5, h / 2 - 2, -150);
-      back.add(b);
-    }
-    // distant cranes, for the building-site feel
+    back.add(crowns, trunks);
+
+    // distant cranes, for the building-site feel, with blinking tip lights
     const craneMat = this.toon('#f2c14e');
-    for (const [x, s] of [[-75, 1], [60, 0.8]]) {
+    this.blinkers = [];
+    for (const [x, s] of [[-85, 1], [75, 0.8]]) {
       const crane = new THREE.Group();
       const mast = new THREE.Mesh(new THREE.BoxGeometry(1.4, 46, 1.4), craneMat); mast.position.y = 23; crane.add(mast);
       const jib = new THREE.Mesh(new THREE.BoxGeometry(40, 1.2, 1.2), craneMat); jib.position.set(10, 45, 0); crane.add(jib);
       const cab = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), this.toon('#e98b3a')); cab.position.set(0, 42, 0); crane.add(cab);
-      crane.position.set(x, -2, -120); crane.scale.setScalar(s);
+      const hook = new THREE.Mesh(new THREE.BoxGeometry(0.2, 14, 0.2), this.toon('#555555')); hook.position.set(24, 38, 0); crane.add(hook);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), flat('#ff3b3b')); lamp.position.set(30, 46.5, 0); crane.add(lamp);
+      this.blinkers.push(lamp);
+      crane.position.set(x, -2, -130); crane.scale.setScalar(s);
       back.add(crane);
     }
+
+    // a fence and bushes along the back of the field
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.25, 1.4, 0.25), this.toon('#fff4e0'), 60);
+    for (let i = 0; i < 60; i++) { tmpM.compose(tmpP.set(-59 + i * 2, 0.7, -6.2), tmpQ.identity(), tmpS.set(1, 1, 1)); posts.setMatrixAt(i, tmpM); }
+    back.add(posts);
+    for (const y of [0.55, 1.1]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(120, 0.14, 0.1), this.toon('#fff4e0'));
+      rail.position.set(0, y, -6.1);
+      back.add(rail);
+    }
+    const bushes = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), this.toon('#ffffff'), 40);
+    for (let i = 0; i < 40; i++) {
+      const s = 0.8 + ((i * 13) % 7) / 8;
+      tmpM.compose(tmpP.set(-60 + i * 3.1 + Math.sin(i) * 0.8, s * 0.5, -7.2), tmpQ.identity(), tmpS.set(s * 1.3, s, s));
+      bushes.setMatrixAt(i, tmpM);
+      bushes.setColorAt(i, col.set(greens[(i + 2) % greens.length]));
+    }
+    back.add(bushes);
+    // a meadow between the field and the hills
+    const meadow = new THREE.Mesh(new THREE.PlaneGeometry(700, 60), flat('#7fd06b'));
+    meadow.rotation.x = -Math.PI / 2;
+    meadow.position.set(0, -0.05, -36);
+    back.add(meadow);
+
+    // clouds
     this.clouds = [];
     const cloudMat = this.toon('#ffffff');
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       const cloud = new THREE.Group();
-      for (let k = 0; k < 4; k++) {
+      const n = 4 + (i % 3);
+      for (let k = 0; k < n; k++) {
         const puff = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), cloudMat);
-        puff.position.set(k * 2.2 - 3, Math.sin(k * 1.7) * 0.6, 0);
-        puff.scale.setScalar(1.6 + ((k * 31 + i * 7) % 10) / 8);
+        const r = 1.4 + ((k * 31 + i * 7) % 10) / 7;
+        puff.position.set(k * 2.1 - n, (k === 1 || k === 2 ? 0.9 : 0) + Math.sin(k * 1.7) * 0.3, (k % 2) * 0.6);
+        puff.scale.setScalar(r);
         cloud.add(puff);
       }
-      cloud.position.set(-90 + i * 22, 22 + (i * 17) % 18, -60 - (i % 3) * 15);
-      cloud.scale.set(1.6, 0.8, 1);
+      cloud.position.set(-120 + i * 21, 26 + (i * 17) % 22, -70 - (i % 3) * 18);
+      cloud.scale.set(1.7, 0.85, 1);
       this.clouds.push(cloud);
       back.add(cloud);
     }
-    const sun = new THREE.Mesh(new THREE.CircleGeometry(7, 32), new THREE.MeshBasicMaterial({ color: '#fff6b0' }));
-    sun.position.set(55, 48, -160);
-    back.add(sun);
+
+    // a hot-air balloon drifting by
+    const hab = this.airBalloon = new THREE.Group();
+    const env = new THREE.Mesh(new THREE.SphereGeometry(3, 20, 14), new THREE.MeshToonMaterial({ map: TX.balloonStripes(), gradientMap: this.ramp }));
+    env.scale.y = 1.15;
+    const basket = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.4), this.toon('#a0612e'));
+    basket.position.y = -4.6;
+    for (const sx of [-0.6, 0.6]) {
+      const rope = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.6, 0.06), this.toon('#5a3a20'));
+      rope.position.set(sx, -3.6, 0);
+      hab.add(rope);
+    }
+    hab.add(env, basket);
+    hab.position.set(-60, 34, -80);
+    back.add(hab);
+
+    // a few birds
+    this.birds = [];
+    const birdMat = flat('#2a2140');
+    for (let i = 0; i < 5; i++) {
+      const bird = new THREE.Group();
+      for (const sx of [-1, 1]) {
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.1), birdMat);
+        wing.geometry.translate(sx * 0.45, 0, 0);
+        bird.add(wing);
+      }
+      bird.position.set(-40 + i * 3.2, 30 + (i % 2) * 1.6 - i * 0.4, -45);
+      bird.userData.phase = i * 1.3;
+      this.birds.push(bird);
+      back.add(bird);
+    }
     this.scene.add(back);
   }
 
@@ -374,48 +464,54 @@ export class Renderer {
     this.pieceViews.delete(id);
   }
 
+  // a player's spawn step: a solid block from the ground up, with a trim board on top and a name sign.
+  // Where a higher step stands beside it (further out), only the open part is drawn.
   makePlatformView(slot, player) {
     const group = new THREE.Group();
     const color = player?.color || '#999999';
     const L = LAYOUT.slot(slot);
-    const t = LAYOUT.shelfThick;
-    const sign = TX.signTexture(`${player?.kit?.icon || ''} ${player?.name || ''}`.trim(), color, '#ffffff', 512, 80);
-    // the shelf: a coloured board with the player's name on its front edge
-    const shelf = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.shelfW, t, 2.0), [
-      this.toon(color), this.toon(color), this.toon('#f4f1ea'), this.toon(color), this.toon('#ffffff', { map: sign }), this.toon(color),
+    const hasHigher = this.sim.platforms.has(slot + 2);
+    const w = hasHigher ? 1.8 : LAYOUT.shelfW;
+    const xc = L.x0 + L.side * w / 2;
+    const dark = new THREE.Color(color).multiplyScalar(0.78).getStyle();
+    const block = new THREE.Mesh(new THREE.BoxGeometry(w, L.top, 2.0), [
+      this.toon(dark), this.toon(dark), this.toon('#f4f1ea'), this.toon(dark), this.toon(color), this.toon(dark),
     ]);
-    shelf.position.set((L.x0 + L.x1) / 2, L.top - t / 2, 0);
-    shelf.castShadow = shelf.receiveShadow = true;
-    group.add(shelf);
-    // the post holding it up, and a bracket under it
-    const postH = L.top - t;
-    if (postH > 0.05) {
-      const px = L.x1 - L.side * 0.2;
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, postH, 1.6), this.toon('#5b5b6e'));
-      post.position.set(px, postH / 2, 0);
-      post.castShadow = true;
-      const brace = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.14, 1.2), this.toon('#5b5b6e'));
-      brace.position.set(px - L.side * 0.55, L.top - t - 0.45, 0);
-      brace.rotation.z = L.side * 0.6;
-      group.add(post, brace);
+    block.position.set(xc, L.top / 2, 0);
+    block.castShadow = block.receiveShadow = true;
+    group.add(block);
+    // panel lines down the front, so it reads as a built thing
+    for (let y = 0.9; y < L.top - 0.4; y += 0.9) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.05, 0.02), this.toon(dark));
+      line.position.set(xc, y, 1.01);
+      group.add(line);
     }
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.14, 2.12), this.toon('#fffaf0'));
+    trim.position.set(xc, L.top - 0.07, 0);
+    trim.receiveShadow = true;
+    group.add(trim);
+    const signH = Math.min(0.55, L.top - 0.3);
+    const sign = TX.signTexture(`${player?.kit?.icon || ''} ${player?.name || ''}`.trim(), color, '#ffffff', 512, Math.round(512 * signH / (w - 0.2)));
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.2, signH), new THREE.MeshBasicMaterial({ map: sign }));
+    plate.position.set(xc, L.top - 0.2 - signH / 2, 1.03);
+    group.add(plate);
     // the turntable where new pieces arrive (it spins when a piece on it is turned)
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.05, 32), new THREE.MeshToonMaterial({ color, gradientMap: this.ramp, transparent: true, opacity: 0.5 }));
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.05, 32), new THREE.MeshToonMaterial({ color, gradientMap: this.ramp, transparent: true, opacity: 0.6 }));
     disc.position.set(L.x, L.top + 0.03, 0);
     for (const a of [0, Math.PI / 2]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.02, 0.1), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }));
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.02, 0.1), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }));
       bar.rotation.y = a;
       bar.position.y = 0.03;
       disc.add(bar);
     }
     group.add(disc);
     if (this.outlines) {
-      const o = new THREE.Mesh(hullOf(shelf.geometry), this.ink());
-      o.position.copy(shelf.position);
+      const o = new THREE.Mesh(hullOf(block.geometry), this.ink());
+      o.position.copy(block.position);
       group.add(o);
     }
     this.scene.add(group);
-    return { group, disc, name: player?.name, color, sign };
+    return { group, disc, name: player?.name, color, sign, hasHigher };
   }
 
   // ---------- claws ----------
@@ -629,7 +725,12 @@ export class Renderer {
     // platforms
     for (const [slot, v] of this.platformViews) {
       const p = playerBySlot.get(slot);
-      if (!sim.platforms.has(slot) || !p || p.name !== v.name) { this.scene.remove(v.group); this.platformViews.delete(slot); }
+      if (!sim.platforms.has(slot) || !p || p.name !== v.name || sim.platforms.has(slot + 2) !== v.hasHigher) {
+        this.scene.remove(v.group);
+        v.group.traverse((o) => { if (o.geometry && !o.userData.shared) o.geometry.dispose(); });
+        v.sign?.dispose();
+        this.platformViews.delete(slot);
+      }
     }
     for (const slot of sim.platforms.keys()) if (!this.platformViews.has(slot)) this.platformViews.set(slot, this.makePlatformView(slot, playerBySlot.get(slot)));
     for (const v of this.platformViews.values()) if (v.spin > 0) { v.spin = Math.max(0, v.spin - dt * 2.5); v.disc.rotation.y += dt * 9 * v.spin; v.disc.material.opacity = 0.5 + 0.4 * v.spin; }
@@ -735,7 +836,17 @@ export class Renderer {
     this.topMarker.visible = sim.tower.height > 0.2;
     this.topMarker.material.color.set(over ? '#5dff8a' : '#ffffff');
 
-    for (const c of this.clouds) { c.position.x += dt * 0.6; if (c.position.x > 110) c.position.x = -110; }
+    for (const c of this.clouds) { c.position.x += dt * 0.6; if (c.position.x > 140) c.position.x = -140; }
+    this.airBalloon.position.x += dt * 0.9;
+    this.airBalloon.position.y = 34 + Math.sin(this.time * 0.3) * 2;
+    if (this.airBalloon.position.x > 120) this.airBalloon.position.x = -120;
+    for (const b of this.birds) {
+      b.position.x += dt * 2.2;
+      if (b.position.x > 70) b.position.x = -70;
+      const f = Math.sin(this.time * 7 + b.userData.phase) * 0.5;
+      b.children[0].rotation.z = -f; b.children[1].rotation.z = f;
+    }
+    for (const l of this.blinkers) l.visible = Math.sin(this.time * 3) > 0;
     this.updateParticles(dt);
     this.updateCamera(dt, game);
   }

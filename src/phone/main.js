@@ -155,6 +155,7 @@ function onStatus(s) {
   if (s.ph === 'countdown') { count.textContent = s.cd; count.className = 'show'; }
   else if (prev?.ph === 'countdown' && s.ph === 'play') { count.textContent = 'GO!'; count.className = 'show go'; setTimeout(() => { if (st.ph === 'play') count.className = ''; }, 900); }
   else if (s.ph !== 'play' || !count.classList.contains('go')) count.className = '';
+  $('#pad .inventory').classList.toggle('busy', !!s.sb);
   if (s.ph !== 'result') result = null;
   if (!prev || prev.ph !== s.ph || prev.ld !== s.ld || prev.free !== s.free) { renderLeaderBar(); renderCards(); renderOverlay(); }
 }
@@ -195,6 +196,7 @@ function renderCards() {
     b.innerHTML = `${pieceIcon(it.id, spawnAngle)}<span class="nm">${esc(def.name)}</span><span class="n">${free ? '∞' : '×' + it.n}</span>`;
     b.onclick = () => {
       if (!free && it.n <= 0) { toast(`No ${def.name} left`); return; }
+      if (st?.sb) { toast('Pick up the piece on your shelf first'); buzz(40); return; }
       send({ t: 'spawn', k, a: spawnAngle * Math.PI / 4 });
       buzz(12);
       b.classList.remove('tapped'); void b.offsetWidth; b.classList.add('tapped');
@@ -289,7 +291,6 @@ const SETTINGS = {
   roundTime: { title: 'Round time', opts: [120, 180, 240, 300, 360], show: fmtTime },
   difficulty: { title: 'Finish line', opts: ['easy', 'normal', 'hard'], show: (v) => ({ easy: 'Low', normal: 'Medium', hard: 'High' }[v]) },
   powerups: { title: 'Power-ups', opts: [true, false], show: (v) => (v ? 'On' : 'Off') },
-  spawnInClaw: { title: 'New pieces', opts: [true, false], show: (v) => (v ? 'Into the claw' : 'On the platform') },
 };
 let menuOpen = false;
 let settingsOpen = false;
@@ -327,7 +328,7 @@ function renderOverlay() {
       `<label class="rename">Name <input maxlength="12" value="${esc(me?.name || '')}"><button data-act="rename">Save</button></label>` +
       (st?.ld && (st.ph === 'play' || st.ph === 'countdown') ? `<button data-act="restart">Restart the round</button>` : '') +
       `<button data-act="fullscreen">Full screen</button><button data-act="code">Leave the game</button><button class="big" data-act="close">Back</button>` +
-      `<div class="help"><b>How to play</b><br>Tap a piece to get it (it appears in your claw, or on your platform). MOVE slides your claw along the bar, ROPE lowers and raises it. GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn what you're holding (or the newest piece on your platform). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
+      `<div class="help"><b>How to play</b><br>Tap a piece to get it: it appears on your shelf at the side (one at a time, so pick it up before you take the next). MOVE slides your claw along the bar, ROPE lowers and raises it. GRAB closes the claw on whatever is between its fingers. DROP lowers the claw on its own and grabs, or lets go. ⟲ ⟳ turn what you're holding (or the piece waiting on your shelf). Build one tower with everyone, over the finish line, and keep it standing when the time runs out!</div>`;
   }
   o.innerHTML = html;
   o.classList.toggle('show', !!html);

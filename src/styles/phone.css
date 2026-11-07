@@ -70,6 +70,9 @@ button.big { font-size: 22px; padding: 12px 18px; background: var(--me); box-sha
 #pad .card.special { background: linear-gradient(135deg, #fff3a8, #ffd1f0); box-shadow: 0 0 0 3px var(--me); animation: glow 1s ease-in-out infinite alternate; }
 @keyframes glow { to { box-shadow: 0 0 0 3px var(--me), 0 0 14px 4px var(--me); } }
 #pad .card.empty { opacity: 0.35; }
+#pad .inventory.busy .card { opacity: 0.45; filter: grayscale(0.5); }
+#pad .inventory.busy::after { content: 'Pick up your piece first'; position: absolute; left: 50%; transform: translateX(-50%); top: -12px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 800; padding: 0 10px; border-radius: 10px; border: 2px solid var(--me); pointer-events: none; }
+#pad .inventory { position: relative; }
 #pad .card.tapped { animation: tap 0.25s; }
 @keyframes tap { 50% { transform: scale(0.9); } }
 

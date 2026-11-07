@@ -38,7 +38,17 @@ ok(ev.filter((e) => e.type === 'count').map((e) => e.n).join() === '2,1', 'count
 ok(ev.some((e) => e.type === 'go') && g.phase === 'play', 'GO!');
 ok(g.spawn('aa', 0, 0) && a.inv[0].n === before - 1, 'spawning during the round uses up a piece');
 const st = g.statusFor('aa');
-ok(st.ph === 'play' && st.g === 2 && st.hn === 'Cube' && st.ld === true, 'the phone status shows the held cube');
+ok(st.ph === 'play' && st.sb === true && st.ld === true, 'the cube waits on the shelf, and the phone knows');
+ok(!g.spawn('aa', 0, 0) && a.inv[0].n === before - 1, 'no second piece while the first is still on the shelf');
+run(g, 0.5);
+// pick the cube up (as if the claw had come down for it)
+const cube = [...g.sim.pieces].find((x) => x.owner === 0);
+g.sim.claws.get(0).attach(cube, false);
+ok(g.statusFor('aa').sb === false && g.statusFor('aa').g === 2, 'once it is picked up the shelf is free');
+g.input('aa', 0, 1);
+run(g, 1.5);
+g.input('aa', 0, 0);
+ok(g.spawn('aa', 0, 0) && a.inv[0].n === before - 2, 'and the next piece can come');
 // build a tower over the line, straight onto the pad
 const finish = g.sim.finishHeight;
 const n = Math.ceil(finish + 1);
