@@ -48,7 +48,7 @@ export const LEVELS = [
     pool: [['magn-cube', 4], ['mags-cube', 4], ['magn-bar', 3], ['mags-bar', 3], ['wood-cube', 4], ['wood-plank', 3]],
   },
   {
-    id: 6, name: 'Shrinking Time', icon: '🌋', time: 270, height: 10, powerups: true,
+    id: 6, name: 'Lava Rising', icon: '🌋', time: 270, height: 10, powerups: true,
     blurb: 'Lava rises halfway up the tower and burns wood (stone and metal don\'t burn): build the bottom half fireproof. Your shelves are rafts on the lava.',
     mods: { lava: { rise: 0.85, upTo: 0.5 } },
     pool: [['stone-slab', 3], ['stone-cube', 7], ['stone-post', 4], ['metal-girder', 2], ['metal-l', 3], ['wood-cube', 6], ['wood-short', 4], ['crate', 2]],
