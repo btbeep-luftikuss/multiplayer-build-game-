@@ -6,7 +6,7 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 
 ## How to play
 
-- Everyone has a **claw** hanging on a rope from the bar at the top of the screen, and their own **spawn platform** at the side, stocked with a kit of pieces nobody else has (wood, stone, steel, toys, ice, bricks, junk, candy).
+- Everyone has a **claw** hanging on a rope from the bar at the top of the screen, and their own **spawn shelf** out at the edge of the field (shelves stack up like stairs on both sides, leaving the middle for building), stocked with a kit of pieces nobody else has (wood, stone, steel, toys, ice, bricks, junk, candy).
 - **Tap a piece** on your phone to get it. It appears straight in your claw if there's room under it (or on your platform; you can change this in the settings).
 - Swing it over to the build pad and **let go**. Pieces stack, slide, tip and topple, all fully simulated.
 - Grab anything, anywhere: your pieces, other people's, even pieces already in the tower. Two claws can lift a heavy base together.

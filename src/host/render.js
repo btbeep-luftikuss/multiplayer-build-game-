@@ -230,7 +230,7 @@ export class Renderer {
     const pad = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.padHalf * 2, LAYOUT.padTop, 2.2), [
       this.toon('#ffffff', { map: TX.stripesTexture() }), this.toon('#ffffff', { map: TX.stripesTexture() }),
       this.toon('#ffffff', { map: TX.concreteTexture() }), this.toon('#bdb6aa'),
-      this.toon('#ffffff', { map: TX.signTexture('BUILD HERE', '#ffc21a', '#2a2a2a', 1024, 40) }), this.toon('#bdb6aa'),
+      this.toon('#ffffff', { map: TX.signTexture('BUILD HERE       ·       BUILD HERE       ·       BUILD HERE', '#ffc21a', '#2a2a2a', 2048, 26) }), this.toon('#bdb6aa'),
     ]);
     pad.position.set(0, LAYOUT.padTop / 2, 0);
     pad.receiveShadow = pad.castShadow = true;
@@ -259,12 +259,15 @@ export class Renderer {
     // the finish line: a checkered band behind the build and a glowing sheet across it
     const fy = sim.finishY;
     const fw = LAYOUT.groundHalf * 2;
-    const chk = TX.checkerTexture().clone();
-    chk.needsUpdate = true;
-    chk.repeat.set(fw / 0.3, 1);
-    this.finishBand = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.3), new THREE.MeshBasicMaterial({ map: chk, transparent: true, opacity: 0.9 }));
+    const dots = TX.dotsTexture();
+    dots.repeat.set(fw / 0.6, 1);
+    this.finishBand = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.3), new THREE.MeshBasicMaterial({ map: dots, transparent: true, depthWrite: false }));
     this.finishBand.position.set(0, fy, -1.05);
     w.add(this.finishBand);
+    // and the same dots in front of the build, so the line reads across the tower too
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.3), new THREE.MeshBasicMaterial({ map: dots, transparent: true, opacity: 0.55, depthWrite: false }));
+    front.position.set(0, fy, 1.05);
+    w.add(front);
     this.finishSheet = new THREE.Mesh(new THREE.PlaneGeometry(fw, 2.2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false }));
     this.finishSheet.rotation.x = -Math.PI / 2;
     this.finishSheet.position.set(0, fy, 0);
@@ -281,26 +284,8 @@ export class Renderer {
       w.add(flag);
       this.finishFlags.push(cloth);
     }
-    // a measuring stick beside the pad
-    const rulerH = Math.ceil(sim.finishHeight + 2);
-    const rc = document.createElement('canvas');
-    rc.width = 64; rc.height = rulerH * 64;
-    const rg = rc.getContext('2d');
-    rg.fillStyle = '#fffaf0'; rg.fillRect(0, 0, 64, rc.height);
-    rg.fillStyle = '#2a2140'; rg.font = '900 26px "Baloo 2", system-ui, sans-serif'; rg.textAlign = 'center';
-    for (let m = 0; m <= rulerH; m++) {
-      const y = rc.height - m * 64;
-      rg.fillRect(0, y - 2, 64, 4);
-      rg.fillRect(0, y - 34, 18, 3);
-      if (m > 0 && m < rulerH) rg.fillText(String(m), 40, y + 10);
-    }
-    const rt = new THREE.CanvasTexture(rc);
-    rt.colorSpace = THREE.SRGBColorSpace;
-    const ruler = new THREE.Mesh(new THREE.BoxGeometry(0.34, rulerH, 0.1), [this.toon('#6b6390'), this.toon('#6b6390'), this.toon('#6b6390'), this.toon('#6b6390'), this.toon('#ffffff', { map: rt, transparent: true, opacity: 0.75 }), this.toon('#6b6390')]);
-    ruler.position.set(-LAYOUT.padHalf - 0.4, LAYOUT.padTop + rulerH / 2, -1.6);
-    w.add(ruler);
     // the tower's current top: a dashed marker
-    this.topMarker = new THREE.Mesh(new THREE.PlaneGeometry(LAYOUT.padHalf * 2 + 1, 0.06), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
+    this.topMarker = new THREE.Mesh(new THREE.PlaneGeometry(7, 0.06), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
     this.topMarker.position.set(0, LAYOUT.padTop, -1.02);
     w.add(this.topMarker);
     this.scene.add(w);
@@ -392,26 +377,41 @@ export class Renderer {
   makePlatformView(slot, player) {
     const group = new THREE.Group();
     const color = player?.color || '#999999';
-    const x = LAYOUT.slotX(slot);
-    const sign = TX.signTexture(`${player?.kit?.icon || ''} ${player?.name || ''}`.trim(), color, '#ffffff', 512, 160);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.platformW, LAYOUT.platformTop, 2.0), [
+    const L = LAYOUT.slot(slot);
+    const t = LAYOUT.shelfThick;
+    const sign = TX.signTexture(`${player?.kit?.icon || ''} ${player?.name || ''}`.trim(), color, '#ffffff', 512, 80);
+    // the shelf: a coloured board with the player's name on its front edge
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.shelfW, t, 2.0), [
       this.toon(color), this.toon(color), this.toon('#f4f1ea'), this.toon(color), this.toon('#ffffff', { map: sign }), this.toon(color),
     ]);
-    box.position.set(x, LAYOUT.platformTop / 2, 0);
-    box.castShadow = box.receiveShadow = true;
-    // the turntable (it spins when a piece on it is turned)
-    const disc = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.05, 32), new THREE.MeshToonMaterial({ color, gradientMap: this.ramp, transparent: true, opacity: 0.5 }));
-    disc.position.set(x, LAYOUT.platformTop + 0.03, 0);
+    shelf.position.set((L.x0 + L.x1) / 2, L.top - t / 2, 0);
+    shelf.castShadow = shelf.receiveShadow = true;
+    group.add(shelf);
+    // the post holding it up, and a bracket under it
+    const postH = L.top - t;
+    if (postH > 0.05) {
+      const px = L.x1 - L.side * 0.2;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, postH, 1.6), this.toon('#5b5b6e'));
+      post.position.set(px, postH / 2, 0);
+      post.castShadow = true;
+      const brace = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.14, 1.2), this.toon('#5b5b6e'));
+      brace.position.set(px - L.side * 0.55, L.top - t - 0.45, 0);
+      brace.rotation.z = L.side * 0.6;
+      group.add(post, brace);
+    }
+    // the turntable where new pieces arrive (it spins when a piece on it is turned)
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.05, 32), new THREE.MeshToonMaterial({ color, gradientMap: this.ramp, transparent: true, opacity: 0.5 }));
+    disc.position.set(L.x, L.top + 0.03, 0);
     for (const a of [0, Math.PI / 2]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.02, 0.12), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }));
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.02, 0.1), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }));
       bar.rotation.y = a;
       bar.position.y = 0.03;
       disc.add(bar);
     }
-    group.add(box, disc);
+    group.add(disc);
     if (this.outlines) {
-      const o = new THREE.Mesh(hullOf(box.geometry), this.ink());
-      o.position.copy(box.position);
+      const o = new THREE.Mesh(hullOf(shelf.geometry), this.ink());
+      o.position.copy(shelf.position);
       group.add(o);
     }
     this.scene.add(group);
@@ -731,7 +731,7 @@ export class Renderer {
     this.finishSheet.material.color.set(over ? '#5dff8a' : '#ffffff');
     this.finishSheet.material.opacity = over ? 0.35 + 0.15 * Math.sin(this.time * 6) : 0.18;
     for (const f of this.finishFlags) f.rotation.y = Math.sin(this.time * 3 + f.position.x) * 0.3;
-    this.topMarker.position.y = LAYOUT.padTop + sim.tower.height;
+    this.topMarker.position.set(sim.tower.x, LAYOUT.padTop + sim.tower.height, -1.02);
     this.topMarker.visible = sim.tower.height > 0.2;
     this.topMarker.material.color.set(over ? '#5dff8a' : '#ffffff');
 
@@ -795,8 +795,8 @@ export class Renderer {
   // keep every claw, every platform in use and the whole tower in view, from the top bar to the ground
   updateCamera(dt, game) {
     const sim = this.sim;
-    let x0 = -LAYOUT.padHalf - 2.5, x1 = LAYOUT.padHalf + 2.5;
-    for (const slot of sim.platforms.keys()) { const x = LAYOUT.slotX(slot); x0 = Math.min(x0, x - 2.4); x1 = Math.max(x1, x + 2.4); }
+    let x0 = -LAYOUT.padHalf - 1.5, x1 = LAYOUT.padHalf + 1.5;
+    for (const slot of sim.platforms.keys()) { const L = LAYOUT.slot(slot); x0 = Math.min(x0, L.x0 - 1, L.x1 - 1); x1 = Math.max(x1, L.x0 + 1, L.x1 + 1); }
     for (const c of sim.claws.values()) {
       const hx = c.body.getPosition().x;
       x0 = Math.min(x0, c.x - 1.6, hx - 1.6); x1 = Math.max(x1, c.x + 1.6, hx + 1.6);
@@ -804,8 +804,9 @@ export class Renderer {
     for (const p of sim.tower.set) { const x = p.body.getPosition().x; x0 = Math.min(x0, x - 2); x1 = Math.max(x1, x + 2); }
     const y0 = -1.2, y1 = sim.topY + 1.0;
     // room for the timer at the top and the height meter at the side
-    let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 + 0.4;
-    let w = (x1 - x0) * 1.1, h = (y1 - y0) * 1.16;
+    let w = (x1 - x0) * 1.16, h = (y1 - y0) * 1.16;
+    // a little extra on the right, where the height meter is
+    let cx = (x0 + x1) / 2 + w * 0.035, cy = (y0 + y1) / 2 + 0.4;
     if (game.phase === 'judge' && sim.tower.count) {
       // time's up: lean in on the tower
       const k = clamp(game.phaseT / 1.2, 0, 1) * 0.35;

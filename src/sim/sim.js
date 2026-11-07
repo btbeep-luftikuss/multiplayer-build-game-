@@ -11,15 +11,21 @@ const CAT = { STATIC: 0x1, PIECE: 0x2, CLAW: 0x4 };
 const DEG = Math.PI / 180;
 
 export const LAYOUT = {
-  padHalf: 4,          // the build pad runs from -4 to 4
+  padHalf: 12,         // the build pad runs from -12 to 12: most of the ground
   padTop: 0.3,
-  groundHalf: 21.5,
-  platformW: 3,
-  platformTop: 1.0,
-  barHalf: 21,
+  groundHalf: 23,
+  barHalf: 22.6,
+  shelfW: 3,
+  shelfThick: 0.45,
   killY: -8,
-  // spawn platforms alternate left and right, filling outwards from the pad
-  slotX: (s) => (s % 2 === 0 ? -1 : 1) * (6.2 + Math.floor(s / 2) * 3.8),
+  // Spawn shelves out at the far left and right, alternating sides, stacked like stairs: each
+  // higher shelf sits 1.8 m further out, so a claw can still reach down past it to the one below.
+  // x0/x1: the shelf's inner and outer ends; x: where new pieces arrive (the part a claw can reach).
+  slot(s) {
+    const side = s % 2 === 0 ? -1 : 1, level = Math.floor(s / 2);
+    const inner = 14 + level * 1.8;
+    return { side, level, top: 1.0 + level * 2.8, x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + 0.9) };
+  },
 };
 
 export const CLAW = {
@@ -432,14 +438,20 @@ export class Sim {
 
   addPlayer(slot) {
     if (this.claws.has(slot)) return this.claws.get(slot);
-    const x = LAYOUT.slotX(slot);
+    const L = LAYOUT.slot(slot);
     const plat = this.world.createBody({ type: 'static' });
+    const t = LAYOUT.shelfThick;
     plat.createFixture({
-      shape: new Box(LAYOUT.platformW / 2, LAYOUT.platformTop / 2, Vec2(x, LAYOUT.platformTop / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC,
+      shape: new Box(LAYOUT.shelfW / 2, t / 2, Vec2((L.x0 + L.x1) / 2, L.top - t / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC,
     });
+    // the post holding the shelf up, at its outer end
+    const postH = L.top - t;
+    if (postH > 0.05) {
+      plat.createFixture({ shape: new Box(0.15, postH / 2, Vec2(L.x1 - L.side * 0.2, postH / 2), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+    }
     plat.setUserData({ kind: 'platform', slot });
     this.platforms.set(slot, plat);
-    const claw = new Claw(this, slot, x);
+    const claw = new Claw(this, slot, L.x);
     this.claws.set(slot, claw);
     return claw;
   }
@@ -506,10 +518,10 @@ export class Sim {
     if (!this.platforms.has(slot)) return null;
     const shape = PIECES[type].shape;
     const e = extentsOf(shape, angle);
-    const cx = LAYOUT.slotX(slot);
-    for (const lift of [0, 1.3, 2.6]) {
-      for (const dx of [0, -0.75, 0.75]) {
-        const x = cx + dx - (e.x0 + e.x1) / 2, y = LAYOUT.platformTop + 0.04 - e.y0 + lift;
+    const L = LAYOUT.slot(slot);
+    for (const lift of [0, 1.1, 2.2]) {
+      for (const dx of [0, -0.75 * L.side, 0.75 * L.side]) {
+        const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.04 - e.y0 + lift;
         if (!this.blocked(shape, x, y, angle)) return this.createPiece(type, slot, x, y, angle);
       }
     }
@@ -533,7 +545,7 @@ export class Sim {
     const e = extentsOf(best.shape, next);
     const pos = best.body.getPosition();
     for (const lift of [0.04, 0.4, 0.8, 1.3]) {
-      const y = LAYOUT.platformTop - e.y0 + lift;
+      const y = LAYOUT.slot(slot).top - e.y0 + lift;
       if (!this.blocked(best.shape, pos.x, y, next, best.body)) {
         best.body.setTransform(Vec2(pos.x, y), next);
         best.body.setLinearVelocity(Vec2(0, 0));

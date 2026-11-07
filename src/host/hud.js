@@ -168,13 +168,13 @@ export class Hud {
 
     // labels on the finish line and the tower top
     const fl = $('#finish-label', this.root);
-    const fp = r.project(-LAYOUT.padHalf - 1.6, sim.finishY, -1.1);
+    const fp = r.project(-LAYOUT.padHalf - 1.2, sim.finishY, -1.1);
     fl.style.transform = `translate(${fp.x}px, ${fp.y}px) translate(-100%, -50%)`;
     $('b', fl).textContent = `${sim.finishHeight} m`;
     fl.classList.toggle('over', h >= sim.finishHeight);
     const hl = $('#height-label', this.root);
     if (h > 0.2) {
-      const hp = r.project(LAYOUT.padHalf + 0.6, LAYOUT.padTop + h, -1);
+      const hp = r.project(sim.tower.x + 3.6, LAYOUT.padTop + h, -1);
       hl.style.display = '';
       hl.style.transform = `translate(${hp.x}px, ${hp.y}px) translate(0, -50%)`;
       hl.textContent = `${h.toFixed(1)} m`;

@@ -136,7 +136,7 @@ export class Game {
     dir = dir > 0 ? 1 : -1;
     if (c.rotateStart(dir)) return 'held';
     if (this.sim.turnPlatformPiece(p.slot, dir)) return 'platform';
-    this.toast(p, 'Grab a piece (or spawn one) to turn it');
+    this.toast(p, 'Nothing to turn: grab a piece, or put one on your shelf');
     return false;
   }
 

@@ -184,6 +184,22 @@ export function checkerTexture() {
   return t;
 }
 
+// the finish line: a row of round dots (one per 0.6 m tile)
+export function dotsTexture() {
+  if (cache.has('dots')) return cache.get('dots');
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.strokeStyle = '#1d1d2b'; g.lineWidth = 7;
+  g.beginPath(); g.arc(64, 32, 22, 0, Math.PI * 2); g.fill(); g.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  cache.set('dots', t);
+  return t;
+}
+
 export function grassTexture() {
   if (cache.has('grass')) return cache.get('grass');
   const [c, g] = canvas(256);
