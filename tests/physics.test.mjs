@@ -124,6 +124,23 @@ console.log('A claw reaches a lower shelf under a higher one');
   ok(sim.tower.set.has(p), 'where it counts as tower');
 }
 
+console.log('Big pieces fit on small shelves');
+{
+  const sim = new Sim({ finishHeight: 8, players: 8 });
+  for (let s = 0; s < 8; s++) sim.addPlayer(s);
+  run(sim, 0.5);
+  let all = true;
+  for (const slot of [0, 1, 2, 3, 4, 5]) {
+    for (const [type, turns] of [['wood-beam', 0], ['stone-slab', 0], ['metal-girder', 2], ['wood-beam', 2], ['stone-arch', 1]]) {
+      const p = sim.spawnOnPlatform(slot, type, 0);
+      if (!p) { all = false; console.log(`   no room for a ${type} on shelf ${slot}`); continue; }
+      for (let i = 0; i < turns; i++) if (sim.turnPlatformPiece(slot, 1) !== 'turned') { all = false; console.log(`   could not turn a ${type} on shelf ${slot}`); }
+      sim.removePiece(p, 'test');
+    }
+  }
+  ok(all, 'long beams, heavy bases and girders arrive (and turn upright) on every shelf, even the lower, narrower ones');
+}
+
 console.log('Heavy pieces reel in slower');
 {
   const sim = new Sim({ finishHeight: 8 });

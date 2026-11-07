@@ -610,7 +610,7 @@ export class Sim {
     const shape = PIECES[type].shape;
     const e = extentsOf(shape, angle);
     const L = this.layout.slot(slot);
-    for (const dx of [0, -0.5 * L.side, 0.5 * L.side]) {
+    for (const dx of this.shelfShifts(L, e)) {
       const x = L.x + dx - (e.x0 + e.x1) / 2, y = L.top + 0.025 - e.y0;
       if (!this.blocked(shape, x, y, angle)) {
         const p = this.createPiece(type, slot, x, y, angle);
@@ -619,6 +619,17 @@ export class Sim {
       }
     }
     return null;
+  }
+
+  // where to try putting a piece on a shelf: in the middle of the turntable first, then slid further
+  // and further in towards the pad (a big piece waiting on a small shelf just overhangs its edge,
+  // which is fine: it's held still until it's grabbed), and a little outwards
+  shelfShifts(L, e) {
+    const out = [0];
+    const reach = (e.x1 - e.x0) / 2 + 1;
+    for (let d = 0.25; d <= reach; d += 0.25) out.push(-d * L.side);
+    out.push(0.25 * L.side, 0.5 * L.side);
+    return out;
   }
 
   // A new piece waits on its shelf's turntable, held still at whatever angle it's turned to (so a cube
@@ -654,13 +665,18 @@ export class Sim {
     const next = dir > 0 ? (Math.floor(a / ROT_STEP + 0.02) + 1) * ROT_STEP : (Math.ceil(a / ROT_STEP - 0.02) - 1) * ROT_STEP;
     const e = extentsOf(p.shape, next), e0 = extentsOf(p.shape, a);
     const pos = p.body.getPosition();
-    // keep the middle of the piece where it was, sitting on the shelf
+    // keep the middle of the piece where it was, sitting on the shelf (or slide it in if it no longer fits)
+    const L = this.layout.slot(slot);
     const cx = pos.x + (e0.x0 + e0.x1) / 2;
-    const x = cx - (e.x0 + e.x1) / 2, y = this.layout.slot(slot).top + 0.025 - e.y0;
-    if (this.blocked(p.shape, x, y, next, p.body)) return 'blocked';
-    p.body.setTransform(Vec2(x, y), next);
-    this.emit({ type: 'turn', piece: p.id, slot });
-    return 'turned';
+    const y = L.top + 0.025 - e.y0;
+    for (const dx of this.shelfShifts(L, e)) {
+      const x = cx + dx - (e.x0 + e.x1) / 2;
+      if (this.blocked(p.shape, x, y, next, p.body)) continue;
+      p.body.setTransform(Vec2(x, y), next);
+      this.emit({ type: 'turn', piece: p.id, slot });
+      return 'turned';
+    }
+    return 'blocked';
   }
 
   removePiece(piece, reason) {
