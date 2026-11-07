@@ -129,7 +129,7 @@ console.log('Levels: progress');
   g.startRound();
   run(g, 3.1);
   ok(g.roundTime() === LEVELS[0].time && g.timeLeft > LEVELS[0].time - 1 && g.players.get('a').inv[0].id === LEVELS[0].pool[0][0], "the level's time limit and pieces");
-  for (let i = 0; i < 6; i++) g.sim.createPiece('stone-cube', 0, 0, g.sim.padTop + 0.5 + i, 0);
+  for (let i = 0; i < 9; i++) g.sim.createPiece('stone-cube', 0, 0, g.sim.padTop + 0.5 + i, 0);
   run(g, 10);
   const r = g.result;
   ok(g.phase === 'result' && r.success && r.level.id === 1 && r.unlocked === 2 && r.next === 2, `won: Level 2 unlocked (in ${r?.level?.time} s)`);
@@ -153,7 +153,7 @@ console.log('Levels: progress');
   g3.timeLeft = 0.5; run(g3, 6);
   if (g3.result?.success) ok(g3.progress.remix.wins === 1 && g3.result.next === 'remix', 'a won remix counts, and the next one is ready');
   const mix = remixLevel(3, Math.random);
-  ok(Object.keys(mix.mods).length >= 2 && mix.height > 6.5, `a remix mixes mechanics (${Object.keys(mix.mods).join(', ')}) and gets harder`);
+  ok(Object.keys(mix.mods).length >= 2 && mix.height > 10, `a remix mixes mechanics (${Object.keys(mix.mods).join(', ')}) and gets harder`);
 }
 
 console.log('Levels: moving line has no early win');
