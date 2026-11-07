@@ -136,6 +136,43 @@ console.log('Raised pad above the lava');
   ok(dropped.dead && !onPad.dead, 'the lava burns a piece on the ground, not one on the pad');
 }
 
+console.log('Level 6: lava halfway up, rafts, wood burns');
+{
+  const sim = new Sim({ finishHeight: 10, players: 2, mods: { lava: { rise: 0.85, upTo: 0.5 } } });
+  const claw = sim.addPlayer(0); sim.addPlayer(1);
+  ok(sim.padTop < 0.5 && Math.abs(sim.lavaTop - (sim.padTop + 5)) < 0.01, `the pad is on the ground and the lava can reach halfway (${sim.lavaTop.toFixed(1)} m)`);
+  run(sim, 0.5);
+  const waiting = sim.spawnOnPlatform(0, 'wood-cube', 0);
+  const wood = piece(sim, 'wood-cube', -2, 0.5), stone = piece(sim, 'stone-cube', 2, 0.5);
+  run(sim, 1);
+  sim.lavaY = 3;
+  run(sim, 3);
+  const raft = sim.platforms.get(0), raftTop = raft.getPosition().y + 0.25;
+  ok(Math.abs(raftTop - 3.35) < 0.05, `the rafts float on the lava (top at ${raftTop.toFixed(2)} m)`);
+  ok(!waiting.dead && waiting.parked && Math.abs(waiting.body.getPosition().y - (raftTop + 0.525)) < 0.06, 'and carry the waiting piece up with them');
+  ok(wood.dead && !stone.dead, 'the lava burns the wooden cube, not the stone one');
+  // over open lava (the pad is under it), all the way down
+  const home = claw.x;
+  claw.input.mx = 1;
+  run(sim, 6, () => { if (claw.x > -3) claw.input.mx = 0; });
+  claw.input.ry = -1;
+  let lowest = 99;
+  run(sim, 6, () => { lowest = Math.min(lowest, claw.body.getWorldPoint({ x: 0, y: -0.14 }).y); });
+  ok(lowest >= sim.lavaY - 0.03 && claw.body.getPosition().y < sim.lavaY + 1, `a claw lowered onto open lava sits on its surface (lowest ${lowest.toFixed(2)} m, lava ${sim.lavaY} m)`);
+  claw.input.ry = 1;
+  run(sim, 2);
+  claw.input.ry = 0;
+  run(sim, 10, () => { // back over the raft, gently
+    claw.input.mx = Math.max(-1, Math.min(1, (home - claw.x) * 0.9 - claw.vx * 0.25));
+    const v = claw.body.getLinearVelocity();
+    if (Math.abs(home - claw.x) < 0.05 && Math.abs(claw.body.getPosition().x - home) < 0.1 && Math.hypot(v.x, v.y) < 0.3) return false;
+  });
+  claw.input.mx = 0;
+  claw.drop();
+  run(sim, 6, () => (claw.state === 'holding' && !claw.auto ? false : undefined));
+  ok(claw.hold?.piece === waiting, 'DROP still grabs the piece off the raft');
+}
+
 console.log('Levels: progress');
 {
   const g = new Game();

@@ -2,23 +2,24 @@
 // Data only (no physics or graphics code), so the phone controller can draw the same pieces as icons.
 // Units are metres; y points up; every shape is centred on its own middle.
 
+// burns: lava burns (or melts) it; stone, metal, brick, glass and gold don't burn
 export const MATERIALS = {
-  wood:     { density: 1.0,  friction: 0.75, restitution: 0.05, color: '#e3a35a', dark: '#b87533', sound: 'wood' },
+  wood:     { density: 1.0,  friction: 0.75, restitution: 0.05, color: '#e3a35a', dark: '#b87533', burns: true, sound: 'wood' },
   stone:    { density: 2.6,  friction: 0.95, restitution: 0.0,  color: '#a9acb5', dark: '#7c808c', sound: 'stone' },
   metal:    { density: 3.2,  friction: 0.5,  restitution: 0.05, color: '#79a8d6', dark: '#4f7aa8', sound: 'metal' },
-  rubber:   { density: 1.1,  friction: 1.2,  restitution: 0.55, color: '#ff5d8f', dark: '#d63a6c', sound: 'rubber' },
-  foam:     { density: 0.25, friction: 0.85, restitution: 0.1,  color: '#ffe066', dark: '#e8b830', sound: 'soft' },
-  ice:      { density: 0.9,  friction: 0.04, restitution: 0.05, color: '#bfefff', dark: '#86cfe8', sound: 'glass' },
+  rubber:   { density: 1.1,  friction: 1.2,  restitution: 0.55, color: '#ff5d8f', dark: '#d63a6c', burns: true, sound: 'rubber' },
+  foam:     { density: 0.25, friction: 0.85, restitution: 0.1,  color: '#ffe066', dark: '#e8b830', burns: true, sound: 'soft' },
+  ice:      { density: 0.9,  friction: 0.04, restitution: 0.05, color: '#bfefff', dark: '#86cfe8', burns: true, sound: 'glass' },
   glass:    { density: 2.0,  friction: 0.35, restitution: 0.1,  color: '#9eead2', dark: '#5fc3a6', sound: 'glass' },
   clay:     { density: 1.8,  friction: 0.9,  restitution: 0.02, color: '#e0674b', dark: '#b1462f', sound: 'stone' },
-  candy:    { density: 0.8,  friction: 0.9,  restitution: 0.15, color: '#ff9ad5', dark: '#e46bb3', sound: 'soft' },
+  candy:    { density: 0.8,  friction: 0.9,  restitution: 0.15, color: '#ff9ad5', dark: '#e46bb3', burns: true, sound: 'soft' },
   gold:     { density: 2.4,  friction: 0.6,  restitution: 0.05, color: '#ffc93c', dark: '#d69a12', sound: 'metal' },
   magN:     { density: 2.4,  friction: 0.7,  restitution: 0.02, color: '#ff5a5a', dark: '#c03030', sound: 'metal' },
   magS:     { density: 2.4,  friction: 0.7,  restitution: 0.02, color: '#4f8dff', dark: '#2a5cc0', sound: 'metal' },
   // special pieces
-  goo:      { density: 1.2,  friction: 1.5,  restitution: 0.0,  color: '#7dff5a', dark: '#3fc22a', sound: 'goo' },
+  goo:      { density: 1.2,  friction: 1.5,  restitution: 0.0,  color: '#7dff5a', dark: '#3fc22a', burns: true, sound: 'goo' },
   magnet:   { density: 2.6,  friction: 0.7,  restitution: 0.0,  color: '#ff4b4b', dark: '#c22424', sound: 'metal' },
-  balloon:  { density: 0.05, friction: 0.4,  restitution: 0.3,  color: '#ff6fb5', dark: '#d84a90', sound: 'soft' },
+  balloon:  { density: 0.05, friction: 0.4,  restitution: 0.3,  color: '#ff6fb5', dark: '#d84a90', burns: true, sound: 'soft' },
   scaffold: { density: 1.4,  friction: 0.9,  restitution: 0.0,  color: '#ffcf2e', dark: '#333333', sound: 'metal' },
 };
 

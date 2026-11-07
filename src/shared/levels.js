@@ -9,7 +9,7 @@ export const MOD_INFO = {
   soft: { icon: '🍮', label: 'Soft ground' },
   tilt: { icon: '🎢', label: 'Rocking base' },
   magnets: { icon: '🧲', label: 'Magnetic blocks' },
-  lava: { icon: '🌋', label: 'Rising lava' },
+  lava: { icon: '🌋', label: 'Rising lava (burns wood)' },
   gravity: { icon: '🪐', label: 'Low gravity on the right' },
   moveLine: { icon: '🎯', label: 'Moving finish line' },
   unstable: { icon: '⚠️', label: 'Unstable claws' },
@@ -48,10 +48,10 @@ export const LEVELS = [
     pool: [['magn-cube', 4], ['mags-cube', 4], ['magn-bar', 3], ['mags-bar', 3], ['wood-cube', 4], ['wood-plank', 3]],
   },
   {
-    id: 6, name: 'Shrinking Time', icon: '🌋', time: 150, height: 10, powerups: true,
-    blurb: 'Less time, and lava rising up the sides burns anything it touches. Don\'t drop anything!',
-    mods: { lava: { rise: 0.8 } },
-    pool: [['wood-cube', 6], ['stone-cube', 4], ['wood-short', 4], ['metal-girder', 2], ['wood-post', 3], ['crate', 2]],
+    id: 6, name: 'Shrinking Time', icon: '🌋', time: 270, height: 10, powerups: true,
+    blurb: 'Lava rises halfway up the tower and burns wood (stone and metal don\'t burn): build the bottom half fireproof. Your shelves are rafts on the lava.',
+    mods: { lava: { rise: 0.85, upTo: 0.5 } },
+    pool: [['stone-slab', 3], ['stone-cube', 7], ['stone-post', 4], ['metal-girder', 2], ['metal-l', 3], ['wood-cube', 6], ['wood-short', 4], ['crate', 2]],
   },
   {
     id: 7, name: 'Dual Gravity Zones', icon: '🪐', time: 210, height: 11, powerups: true,

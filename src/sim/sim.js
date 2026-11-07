@@ -27,13 +27,15 @@ export const LAYOUT = {
 // of open top for its pieces. The TV camera zooms out as far as the claws spread.
 // (Some levels raise everything: `lift` puts the pad up on a mesa and the shelves with it; a rocking
 // base is narrower, `padHalf`.)
-export function makeLayout(topY, players, { padHalf: padOverride = 0, lift = 0 } = {}) {
+// (On a lava level with rafts, `raftTop` gives the shelves' height as the lava rises; the rafts sit side
+// by side rather than as steps.)
+export function makeLayout(topY, players, { padHalf: padOverride = 0, lift = 0, raftTop = null } = {}) {
   const n = Math.max(2, players);
   const levels = Math.max(1, Math.ceil(n / 2));
   const step = 1.8;
   const padHalf = padOverride || 11 + n * 0.5;
   const inner0 = padHalf + 1.4;
-  const halfW = inner0 + (levels - 1) * step + LAYOUT.shelfW + 0.4;
+  const halfW = inner0 + (levels - 1) * (raftTop ? LAYOUT.shelfW + 0.25 : step) + LAYOUT.shelfW + 0.4;
   void topY;
   return {
     halfW, levels,
@@ -43,6 +45,10 @@ export function makeLayout(topY, players, { padHalf: padOverride = 0, lift = 0 }
     // x0/x1: the shelf's inner and outer ends; x: where new pieces arrive (the part a claw can reach)
     slot(s) {
       const side = s % 2 === 0 ? -1 : 1, level = Math.floor(s / 2);
+      if (raftTop) {
+        const inner = inner0 + level * (LAYOUT.shelfW + 0.25);
+        return { side, level, raft: true, top: raftTop(), x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + LAYOUT.shelfW / 2) };
+      }
       const inner = inner0 + level * step;
       return { side, level, top: 1.0 + lift + level * 2.8, x0: side * inner, x1: side * (inner + LAYOUT.shelfW), x: side * (inner + 0.9) };
     },
@@ -263,6 +269,19 @@ export class Claw {
   postStep(dt) {
     const f = this.rope.getReactionForce(1 / dt);
     this.lastTension = Math.hypot(f.x, f.y);
+    // lava is solid to a claw: it sits on the surface instead of dipping in
+    this.onLava = false;
+    if (this.sim.lavaY > -10) {
+      const bottom = this.body.getWorldPoint(Vec2(0, CLAW.hubCy - CLAW.hubHalfH)).y;
+      if (bottom < this.sim.lavaY + 0.02) {
+        const p = this.body.getPosition(), v = this.body.getLinearVelocity();
+        this.body.setTransform(Vec2(p.x, p.y + (this.sim.lavaY + 0.02 - bottom)), this.body.getAngle());
+        if (v.y < 0) this.body.setLinearVelocity(Vec2(v.x, 0));
+        this.ropeLen = Math.min(this.ropeLen, this.ropeDistance() + 0.3);
+        this.rope.setMaxLength(this.ropeLen);
+        this.onLava = true;
+      }
+    }
     // the bar is in the way: a claw swinging up hard (low gravity, a short rope, a sudden stop) bumps
     // its underside instead of looping right over the top
     const ceiling = this.sim.topY + CLAW.ropeOnTrolley - 0.3;
@@ -279,7 +298,7 @@ export class Claw {
       if (a.t > 0.7) this.auto = null;
       return;
     }
-    if (this.touchingSomething() || this.ropeLen >= this.maxRope() - 0.02) a.touch += dt;
+    if (this.touchingSomething() || this.onLava || this.ropeLen >= this.maxRope() - 0.02) a.touch += dt;
     else a.touch = 0;
     if (a.touch > 0.12) {
       if (this.hold) {
@@ -455,7 +474,10 @@ export class Sim {
     this.mods = mods;
     // some mechanics need the pad raised: a sinking jelly base, a rocking base on a pivot, a mesa above the lava
     this.softTravel = mods.soft ? 0.75 : 0;
-    const lift = (mods.soft ? 0.8 : 0) + (mods.tilt ? 1.0 : 0) + (mods.lava ? 1.4 : 0);
+    // lava that rises part way up the tower (`upTo`, a share of the finish height) leaves the pad on the
+    // ground and floats the shelves as rafts; lava that stays low raises the pad onto a mesa above it
+    this.rafts = !!(mods.lava && mods.lava.upTo);
+    const lift = (mods.soft ? 0.8 : 0) + (mods.tilt ? 1.0 : 0) + (mods.lava && !this.rafts ? 1.4 : 0);
     this.padTop = LAYOUT.padTop + lift;
     this.finishBase = finishHeight;
     this.finishHeight = finishHeight;
@@ -463,7 +485,7 @@ export class Sim {
     this.lineAmp = mods.moveLine ? mods.moveLine.amp : 0;
     this.lineFrozen = false;
     this.topY = this.finishY + this.lineAmp + 6.5;
-    this.layout = makeLayout(this.topY, players, { lift, padHalf: mods.tilt ? 7 + players * 0.3 : 0 });
+    this.layout = makeLayout(this.topY, players, { lift, padHalf: mods.tilt ? 7 + players * 0.3 : 0, raftTop: this.rafts ? () => this.raftTop() : null });
     this.barLimit = this.layout.halfW - 0.7;
     this.pieces = new Set();
     this.claws = new Map();      // slot -> Claw
@@ -477,7 +499,7 @@ export class Sim {
     this.wind = 0;               // now: sideways push, m/s² at the finish line (+ is to the right)
     this.tilt = 0;               // now: the rocking base's angle
     // the lava: the game raises it over the round, up to just under the pad
-    this.lavaTop = this.padTop - 0.25 - this.softTravel - (mods.tilt ? Math.sin((mods.tilt.amp * Math.PI) / 180) * this.layout.padHalf : 0);
+    this.lavaTop = this.rafts ? this.padTop + mods.lava.upTo * finishHeight : this.padTop - 0.25 - this.softTravel - (mods.tilt ? Math.sin((mods.tilt.amp * Math.PI) / 180) * this.layout.padHalf : 0);
     this.lavaY = mods.lava ? -0.6 : -Infinity;
 
     const ground = this.world.createBody({ type: 'static' });
@@ -548,11 +570,18 @@ export class Sim {
   addPlayer(slot) {
     if (this.claws.has(slot)) return this.claws.get(slot);
     const L = this.layout.slot(slot);
-    const plat = this.world.createBody({ type: 'static' });
-    // a solid step from the ground up (the higher steps, further out, overlap its outer part)
-    plat.createFixture({
-      shape: new Box(LAYOUT.shelfW / 2, L.top / 2, Vec2((L.x0 + L.x1) / 2, L.top / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC,
-    });
+    let plat;
+    if (L.raft) {
+      // a raft riding on the lava
+      plat = this.world.createBody({ type: 'kinematic', position: Vec2((L.x0 + L.x1) / 2, L.top - 0.25) });
+      plat.createFixture({ shape: new Box(LAYOUT.shelfW / 2, 0.25), friction: 0.95, filterCategoryBits: CAT.STATIC });
+    } else {
+      plat = this.world.createBody({ type: 'static' });
+      // a solid step from the ground up (the higher steps, further out, overlap its outer part)
+      plat.createFixture({
+        shape: new Box(LAYOUT.shelfW / 2, L.top / 2, Vec2((L.x0 + L.x1) / 2, L.top / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC,
+      });
+    }
     plat.setUserData({ kind: 'platform', slot });
     this.platforms.set(slot, plat);
     const claw = new Claw(this, slot, L.x);
@@ -634,6 +663,9 @@ export class Sim {
     }
     return null;
   }
+
+  // rafts float on the lava (and sit on the ground until it reaches them)
+  raftTop() { return Math.max(0.55, this.lavaY + 0.35); }
 
   // where to try putting a piece on a shelf: in the middle of the turntable first, then slid further
   // and further in towards the pad (a big piece waiting on a small shelf just overhangs its edge,
@@ -943,6 +975,15 @@ export class Sim {
       this.finishHeight = this.finishBase + this.lineAmp * Math.sin((2 * Math.PI * t) / m.moveLine.period);
       this.finishY = this.padTop + this.finishHeight;
     }
+    // the rafts ride up with the lava, carrying the pieces waiting on them
+    if (this.rafts) {
+      const want = this.raftTop() - 0.25;
+      for (const [slot, raft] of this.platforms) {
+        const vy = clamp((want - raft.getPosition().y) / dt, -3, 3);
+        raft.setLinearVelocity(Vec2(0, vy));
+        for (const p of this.pieces) if (p.parked && p.owner === slot) p.body.setLinearVelocity(Vec2(0, vy));
+      }
+    }
     // the base rocking from side to side
     if (m.tilt) {
       const A = (m.tilt.amp * Math.PI) / 180;
@@ -1016,7 +1057,7 @@ export class Sim {
     // the lava burns whatever reaches down into it
     if (this.lavaY > -Infinity) {
       for (const p of [...this.pieces]) {
-        if (!p.dead && !p.parked && bodyBottom(p.body) < this.lavaY) {
+        if (!p.dead && !p.parked && MATERIALS[p.mat].burns && bodyBottom(p.body) < this.lavaY) {
           const pos = p.body.getPosition();
           this.removePiece(p, 'burn');
           this.emit({ type: 'burn', x: pos.x, y: this.lavaY });

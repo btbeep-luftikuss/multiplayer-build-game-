@@ -530,6 +530,7 @@ export class Renderer {
     const group = new THREE.Group();
     const color = player?.color || '#999999';
     const L = this.sim.layout.slot(slot);
+    if (L.raft) return this.makeRaftView(slot, player, L);
     const hasHigher = this.sim.platforms.has(slot + 2);
     const w = hasHigher ? 1.8 : LAYOUT.shelfW;
     const xc = L.x0 + L.side * w / 2;
@@ -572,6 +573,27 @@ export class Renderer {
     }
     this.scene.add(group);
     return { group, disc, name: player?.name, color, sign, hasHigher };
+  }
+
+  // a raft on the lava: a dark basalt slab with a coloured rim, riding up as the lava rises
+  makeRaftView(slot, player, L) {
+    const group = new THREE.Group();
+    const color = player?.color || '#999999';
+    const raft = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.shelfW, 0.5, 2.0), [
+      this.toon('#4a4048'), this.toon('#4a4048'), this.toon('#ffffff', { map: TX.materialTexture('stone', '#6b5f66') }), this.toon('#2e272c'), this.toon('#4a4048'), this.toon('#4a4048'),
+    ]);
+    raft.castShadow = raft.receiveShadow = true;
+    const rim = new THREE.Mesh(new THREE.BoxGeometry(LAYOUT.shelfW + 0.1, 0.12, 2.1), this.toon(color));
+    rim.position.y = 0.2;
+    const sign = TX.signTexture(`${player?.kit?.icon || ''} ${player?.name || ''}`.trim(), color, '#ffffff', 512, 80);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(LAYOUT.shelfW - 0.3, 0.32), new THREE.MeshBasicMaterial({ map: sign }));
+    plate.position.set(0, -0.05, 1.01);
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.05, 32), new THREE.MeshToonMaterial({ color, gradientMap: this.ramp, transparent: true, opacity: 0.6 }));
+    disc.position.set(L.x - (L.x0 + L.x1) / 2, 0.28, 0);
+    group.add(raft, rim, plate, disc);
+    if (this.outlines) group.add(new THREE.Mesh(hullOf(raft.geometry), this.ink()));
+    this.scene.add(group);
+    return { group, disc, name: player?.name, color, sign, hasHigher: this.sim.platforms.has(slot + 2), body: this.sim.platforms.get(slot) };
   }
 
   // ---------- claws ----------
@@ -797,6 +819,7 @@ export class Renderer {
       }
     }
     for (const slot of sim.platforms.keys()) if (!this.platformViews.has(slot)) this.platformViews.set(slot, this.makePlatformView(slot, playerBySlot.get(slot)));
+    for (const v of this.platformViews.values()) if (v.body) { const p = v.body.getPosition(); v.group.position.set(p.x, p.y, 0); }
     for (const v of this.platformViews.values()) if (v.spin > 0) { v.spin = Math.max(0, v.spin - dt * 2.5); v.disc.rotation.y += dt * 9 * v.spin; v.disc.material.opacity = 0.5 + 0.4 * v.spin; }
 
     // pieces

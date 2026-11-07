@@ -24,7 +24,7 @@ Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play*
 | 3 | Soft Ground | The base is springy jelly: heavy pieces sink where they land |
 | 4 | Rotating Platform | The base slowly rocks from side to side (in a side view, that's how it turns) |
 | 5 | Magnetic Blocks | Red N and blue S blocks: opposites pull together, same colours push apart |
-| 6 | Shrinking Time | Much less time, and lava rises up the sides, burning anything that touches it |
+| 6 | Shrinking Time | Lava rises halfway up the tower and burns wood (stone, metal, brick and glass don't burn), so build the bottom half fireproof; the shelves are rafts floating on the lava, and claws can't dip into it |
 | 7 | Dual Gravity Zones | Normal gravity on the left, floaty low gravity on the right |
 | 8 | Moving Target Line | The finish line drifts up and down; only the moment time runs out counts |
 | 9 | Unstable Claws | Grips slip and ropes stretch at random; glass shatters on hard hits |
