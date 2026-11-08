@@ -14,6 +14,8 @@ const ICE = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  // a second free relay, also over the web's own ports (80 and 443, TCP too) for networks that block the rest
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 const BACKLOG = 64 * 1024; // bytes waiting on a line before droppable messages are skipped
 
@@ -134,7 +136,7 @@ export function joinRoom({ code, local, hello, ...h }) {
 
 function peerClient(code, hello, h) {
   let peer = null, conn = null, closed = false;
-  let lastHeard = 0, misses = 0, timer = null, connectTimer = null;
+  let lastHeard = 0, misses = 0, timer = null, connectTimer = null, failed = 0, linkTimer = null;
 
   const connect = () => {
     if (closed || !peer || peer.destroyed) return;
@@ -142,12 +144,27 @@ function peerClient(code, hello, h) {
     clearTimeout(connectTimer);
     const c = peer.connect(peerIdFor(code), { reliable: true, serialization: 'json' });
     conn = c;
-    // a connection that never opens (the TV is gone, or the network blocks it)
-    connectTimer = setTimeout(() => { if (conn === c && !c.open) { c.close(); scheduleRetry(); } }, 8000);
+    // a connection that never opens (the TV is gone, or the network blocks it). A line through a relay
+    // can take a while, so give it time; after a few failures start again from scratch.
+    connectTimer = setTimeout(() => {
+      if (conn !== c || c.open) return;
+      c.close();
+      failed++;
+      if (failed >= 3) { failed = 0; restart(); } else scheduleRetry();
+    }, 15000);
+    // say how the line itself is doing (checking, connected, failed), for the "connecting" screen
+    clearInterval(linkTimer);
+    linkTimer = setInterval(() => {
+      if (conn !== c || c.open) { clearInterval(linkTimer); return; }
+      const st = c.peerConnection && c.peerConnection.iceConnectionState;
+      if (st) h.onStatus?.('connecting', 'link:' + st);
+    }, 1000);
     c.on('open', () => {
       if (conn !== c) return;
       clearTimeout(connectTimer);
+      clearInterval(linkTimer);
       misses = 0;
+      failed = 0;
       lastHeard = Date.now();
       c.send({ ...hello, t: 'hello', v: PROTOCOL });
       h.onStatus?.('open');
@@ -172,6 +189,12 @@ function peerClient(code, hello, h) {
     h.onStatus?.('reconnecting');
     clearTimeout(connectTimer);
     connectTimer = setTimeout(connect, 1500);
+  };
+
+  const restart = () => {
+    if (closed) return;
+    try { peer.destroy(); } catch { /* already */ }
+    start();
   };
 
   const start = () => {
@@ -205,7 +228,7 @@ function peerClient(code, hello, h) {
   return {
     send(msg) { if (conn && conn.open) { try { conn.send(msg); } catch { /* closed */ } } },
     get open() { return !!conn && conn.open; },
-    close() { closed = true; clearInterval(timer); clearTimeout(connectTimer); conn?.close(); peer?.destroy(); },
+    close() { closed = true; clearInterval(timer); clearInterval(linkTimer); clearTimeout(connectTimer); conn?.close(); peer?.destroy(); },
   };
 }
 

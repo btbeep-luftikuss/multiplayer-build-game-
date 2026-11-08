@@ -324,11 +324,13 @@ function renderOverlay() {
   else if (connState === 'connecting' || connState === 'reconnecting' || (connState === 'open' && !me)) {
     // say which step it's on, so a stuck connection can be told apart
     const steps = [['server', 'Reaching the game server'], ['tv', `Looking for the TV (room ${esc(cleanCode(codeIn.value))})`], ['hello', 'Connected: waiting for the TV to answer']];
-    const at = connState === 'open' ? 2 : Math.max(0, steps.findIndex(([k]) => k === connDetail));
+    const link = connDetail.startsWith('link:') ? connDetail.slice(5) : '';
+    const at = connState === 'open' ? 2 : link ? 1 : Math.max(0, steps.findIndex(([k]) => k === connDetail));
     const slow = connSince && Date.now() - connSince > 20000;
     html = `<div class="spinner"></div><h2>${connState === 'reconnecting' ? 'Reconnecting…' : 'Connecting to the TV…'}</h2>` +
       `<ol class="steps">${steps.map(([, t], i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}">${t}</li>`).join('')}</ol>` +
-      (slow ? `<p class="small">${at === 0 ? 'The game server can\'t be reached: check this device\'s Wi-Fi, and try turning off a VPN, Private Relay or content blocker.' : at === 1 ? 'The TV isn\'t answering: check the room code on the TV, and that the TV page is still open.' : 'The TV saw you but hasn\'t answered: reload the TV page and try again.'}</p>` : '') +
+      (link ? `<p class="small">Line to the TV: <b>${esc({ new: 'starting', checking: 'trying the ways through', connected: 'connected', completed: 'connected', failed: 'no way through (the network blocks it)', disconnected: 'dropped', closed: 'closed' }[link] || link)}</b></p>` : '') +
+      (slow ? `<p class="small">${link === 'failed' ? 'The TV and this device can\'t reach each other on this network: try both on the same Wi-Fi, or turn off a VPN, Private Relay or Lockdown Mode on this device.' : at === 0 ? 'The game server can\'t be reached: check this device\'s Wi-Fi, and try turning off a VPN, Private Relay or content blocker.' : at === 1 ? 'The TV isn\'t answering: check the room code on the TV, and that the TV page is still open.' : 'The TV saw you but hasn\'t answered: reload the TV page and try again.'}</p>` : '') +
       `<button data-act="retry">Try again</button><button data-act="code">Change the code</button>`;
   }
   else if (settingsOpen && st?.ld && cfg) {
