@@ -54,6 +54,7 @@ export class Hud {
         <div id="level-chip"><b class="name"></b><span class="mods"></span></div>
         <div id="level-intro"></div>
         <div id="zone-label">🪐 LOW GRAVITY</div>
+        <div id="smash-bar"></div>
         <div id="tags"></div>
         <div id="pops"></div>
         <div id="banner"></div>
@@ -159,7 +160,20 @@ export class Hud {
     this.root.dataset.phase = phase;
     const inLobby = phase === 'lobby';
     this.lobby.classList.toggle('show', inLobby);
-    this.results.classList.toggle('show', phase === 'result' && game.phaseT > 1.2);
+    const resultsUp = phase === 'result' && game.phaseT > 1.2;
+    this.results.classList.toggle('show', resultsUp && !game.smashing);
+    // smash time: the results shrink to a bar so the whole tower is in view
+    const bar = $('#smash-bar', this.root);
+    bar.classList.toggle('show', resultsUp && !!game.smashing);
+    if (resultsUp && game.smashing && game.result && bar._res !== game.result) {
+      bar._res = game.result;
+      const r = game.result, lvl = r.level;
+      bar.innerHTML = `<span class="msg">😈 Smash time! ${r.success ? '★'.repeat(r.stars) : '✗'} ${lvl ? (r.success ? 'Level complete' : 'Level failed') : r.success ? 'The tower stood' : 'Not tall enough'}</span>`;
+      const add = (text, fn, cls = '') => { const b = el('button', cls, text); b.onclick = fn; bar.appendChild(b); };
+      if (lvl && r.success && r.next) add('Next ▶', () => this.actions.next(), 'go');
+      add(lvl ? 'Retry' : 'Play again', () => this.actions.start(), lvl && r.success && r.next ? '' : 'go');
+      add('Results', () => this.actions.smash(false));
+    }
     r.inset = inLobby ? 0.36 : 0;
 
     // timer
@@ -350,6 +364,7 @@ export class Hud {
       button('Play again', 'big', () => this.actions.start());
       button('Change settings', '', () => this.actions.lobby());
     }
+    button('Smash the tower 😈', '', () => this.actions.smash(true));
     $('.stars', R).innerHTML = res.success ? [1, 2, 3].map((i) => `<span class="${i <= res.stars ? 'on' : ''}">★</span>`).join('') : '';
     $('.numbers', R).innerHTML = (res.early ? `<div class="early">Finished with ${fmtTime(Math.ceil(res.timeLeft))} to spare!</div>` : '') + `Height <b>${res.height.toFixed(1)} m</b> · finish line ${m1(res.finish)} m · ${res.pieces} piece${res.pieces === 1 ? '' : 's'} in the tower` +
       (res.success ? (res.stars < 3 ? `<div class="small">Finish within ${fmtTime(Math.floor(res.roundTime * (res.stars === 1 ? 0.75 : 0.5)))} for ${res.stars + 1} stars</div>` : '<div class="small">Top speed!</div>') : `<div class="small">${Math.max(0, res.finish - res.height).toFixed(1)} m short. So close… try again!</div>`);

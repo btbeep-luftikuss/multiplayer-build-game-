@@ -331,9 +331,18 @@ export class Game {
     this.setPhase('lobby');
   }
 
+  // after a round: put the results away so everyone can see (and knock down) the tower
+  smash(on = true) {
+    if (this.phase !== 'result') return false;
+    this.smashing = on;
+    this.emit({ type: 'smash', on });
+    return true;
+  }
+
   setPhase(phase) {
     this.phase = phase;
     this.phaseT = 0;
+    this.smashing = false;
     const handsOff = phase === 'judge' || phase === 'hold';
     for (const c of this.sim.claws.values()) c.enabled = !handsOff;
     this.emit({ type: 'phase', phase });
@@ -363,7 +372,7 @@ export class Game {
       } else {
         // over the line for 3 s in a row: hands off, and see if it stands for 5 s
         // (not when the finish line moves: there only the end counts)
-        this.overT = this.sim.tower.height >= this.sim.finishHeight && !this.sim.lineAmp ? (this.overT || 0) + dt : 0;
+        this.overT = this.sim.tower.height >= this.earlyGoal() ? (this.overT || 0) + dt : 0;
         if (this.overT >= OVER_TIME) this.startHold();
       }
     } else if (this.phase === 'judge') {
@@ -393,8 +402,8 @@ export class Game {
     if (this.phase !== 'play') return;
     const h = this.sim.tower.height;
     // (when the finish line drifts, the tower crossing it back and forth isn't news)
-    if (this.sim.lineAmp) { /* nothing */ } else if (!this.crossed && h >= this.sim.finishHeight) { this.crossed = true; this.emit({ type: 'crossed', height: h }); }
-    else if (this.crossed && h < this.sim.finishHeight - 0.5) { this.crossed = false; this.emit({ type: 'uncrossed', height: h }); }
+    if (!this.crossed && h >= this.earlyGoal()) { this.crossed = true; this.emit({ type: 'crossed', height: h }); }
+    else if (this.crossed && h < this.earlyGoal() - 0.5) { this.crossed = false; this.emit({ type: 'uncrossed', height: h }); }
     // power-ups now and then
     if (this.powerupsOn() && this.elapsed >= this.nextPower && this.timeLeft > 15) {
       this.givePowerup(null, false);
@@ -460,6 +469,9 @@ export class Game {
     this.emit(e);
   }
 
+  // the height that wins early: the finish line, or when it drifts, the top of its swing
+  earlyGoal() { return this.sim.lineAmp ? this.sim.finishBase + this.sim.lineAmp : this.sim.finishHeight; }
+
   startHold() {
     this.overT = 0;
     this.holdFallT = 0;
@@ -473,7 +485,7 @@ export class Game {
     const now = Math.ceil(HOLD_TIME - this.phaseT);
     if (now !== before && now > 0) this.emit({ type: 'holdcount', n: now });
     // fell below the line (for more than a moment): back to building, if there's time left
-    this.holdFallT = this.sim.tower.height < this.sim.finishHeight - 0.05 ? this.holdFallT + dt : 0;
+    this.holdFallT = this.sim.tower.height < this.earlyGoal() - 0.05 ? this.holdFallT + dt : 0;
     if (this.holdFallT > 0.3) {
       this.emit({ type: 'holdfail', height: this.sim.tower.height });
       if (this.timeLeft <= 0) { this.finishRound(); return; }
@@ -568,6 +580,7 @@ export class Game {
       free: this.phase === 'lobby',
       n: this.activeCount,
       md: this.mode,
+      sm: !!this.smashing,
       lv: this.level ? `${this.levelId === 'remix' ? 'Remix' : 'Level ' + this.levelId}: ${this.level.name}` : '',
       bo: c ? Math.max(0, Math.ceil(c.boostUntil - this.sim.time)) : 0,
     };

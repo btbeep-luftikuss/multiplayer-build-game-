@@ -90,6 +90,23 @@ export const SHAPES = {
   magnet:   { parts: [poly(rect(1.3, 0.7))], look: 'magnet' },
   balloon:  { parts: [circle(0.55)], look: 'balloon' },
   scaffold: { parts: [poly(rect(0.4, 3.2))], look: 'scaffold' },
+  // more shapes, so each level's pieces feel different
+  hex: { parts: [poly([[0.6, 0], [0.3, 0.52], [-0.3, 0.52], [-0.6, 0], [-0.3, -0.52], [0.3, -0.52]])] },
+  pyramid: { parts: [poly(centred([[-1.2, 0], [1.2, 0], [0, 1.2]]))] },
+  cup: {
+    parts: [poly(rect(1.6, 0.3, 0, -0.35)), poly(rect(0.3, 0.7, -0.65, 0.15)), poly(rect(0.3, 0.7, 0.65, 0.15))],
+    outline: [[-0.8, -0.5], [0.8, -0.5], [0.8, 0.5], [0.5, 0.5], [0.5, -0.2], [-0.5, -0.2], [-0.5, 0.5], [-0.8, 0.5]],
+  },
+  stairs: {
+    parts: [poly(rect(1.8, 0.4, 0, -0.4)), poly(rect(1.2, 0.4, 0.3, 0)), poly(rect(0.6, 0.4, 0.6, 0.4))],
+    outline: [[-0.9, -0.6], [0.9, -0.6], [0.9, 0.6], [0.3, 0.6], [0.3, 0.2], [-0.3, 0.2], [-0.3, -0.2], [-0.9, -0.2]],
+  },
+  plus: {
+    parts: [poly(rect(1.5, 0.5)), poly(rect(0.5, 1.5))],
+    outline: [[-0.25, -0.75], [0.25, -0.75], [0.25, -0.25], [0.75, -0.25], [0.75, 0.25], [0.25, 0.25], [0.25, 0.75], [-0.25, 0.75], [-0.25, 0.25], [-0.75, 0.25], [-0.75, -0.25], [-0.25, -0.25]],
+  },
+  tall:     { parts: [poly(rect(0.8, 3))] },
+  raft:     { parts: [poly(rect(3.6, 0.4))] },
   // only ever an icon (the Super Claw power-up isn't a piece)
   bolt: {
     parts: [poly(rect(0.8, 1.6))],
@@ -162,11 +179,29 @@ export const PIECES = {
   'candy-post':   { shape: 'post', mat: 'candy', name: 'Candy Cane' },
   'candy-beam':   { shape: 'shortbeam', mat: 'candy', name: 'Wafer' },
   'candy-spire':  { shape: 'spire', mat: 'candy', name: 'Cone' },
+  'wood-hex':     { shape: 'hex', mat: 'wood', name: 'Hex Block' },
+  'stone-hex':    { shape: 'hex', mat: 'stone', name: 'Stone Hex' },
+  'glass-hex':    { shape: 'hex', mat: 'glass', name: 'Glass Hex' },
+  'stone-pyramid':{ shape: 'pyramid', mat: 'stone', name: 'Pyramid' },
+  'wood-cup':     { shape: 'cup', mat: 'wood', name: 'Wooden Cup' },
+  'metal-cup':    { shape: 'cup', mat: 'metal', name: 'Steel Cup' },
+  'wood-stairs':  { shape: 'stairs', mat: 'wood', name: 'Stairs' },
+  'clay-stairs':  { shape: 'stairs', mat: 'clay', name: 'Brick Stairs' },
+  'stone-plus':   { shape: 'plus', mat: 'stone', name: 'Stone Cross' },
+  'metal-plus':   { shape: 'plus', mat: 'metal', name: 'Steel Cross' },
+  'wood-tall':    { shape: 'tall', mat: 'wood', name: 'Tall Pillar' },
+  'stone-tall':   { shape: 'tall', mat: 'stone', name: 'Tall Column' },
+  'wood-raft':    { shape: 'raft', mat: 'wood', name: 'Wide Board' },
+  'foam-raft':    { shape: 'raft', mat: 'foam', name: 'Foam Board' },
   // magnetic blocks (Levels mode): opposite poles pull together, the same push apart
   'magn-cube':    { shape: 'cube', mat: 'magN', name: 'North Cube', pole: 1 },
   'mags-cube':    { shape: 'cube', mat: 'magS', name: 'South Cube', pole: -1 },
   'magn-bar':     { shape: 'shortbeam', mat: 'magN', name: 'North Bar', pole: 1 },
   'mags-bar':     { shape: 'shortbeam', mat: 'magS', name: 'South Bar', pole: -1 },
+  'magn-post':    { shape: 'post', mat: 'magN', name: 'North Post', pole: 1 },
+  'mags-post':    { shape: 'post', mat: 'magS', name: 'South Post', pole: -1 },
+  'magn-plate':   { shape: 'plank', mat: 'magN', name: 'North Plate', pole: 1 },
+  'mags-plate':   { shape: 'plank', mat: 'magS', name: 'South Plate', pole: -1 },
   // special pieces (power-ups): handed out during a round
   'sp-goo':       { shape: 'goo', mat: 'goo', name: 'Sticky Goo', special: 'sticky', tip: 'Glues itself to every piece it touches' },
   'sp-magnet':    { shape: 'magnet', mat: 'magnet', name: 'Magnet', special: 'magnet', tip: 'Pulls nearby pieces in and holds them' },

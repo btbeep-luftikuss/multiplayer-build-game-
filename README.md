@@ -26,9 +26,13 @@ Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play*
 | 5 | Magnetic Blocks | Red N and blue S blocks: opposites pull together, same colours push apart |
 | 6 | Lava Rising | Lava rises halfway up the tower and burns wood (stone, metal, brick and glass don't burn), so build the bottom half fireproof; the shelves are rafts floating on the lava, and claws can't dip into it |
 | 7 | Dual Gravity Zones | Normal gravity on the left, floaty low gravity on the right |
-| 8 | Moving Target Line | The finish line drifts up and down; only the moment time runs out counts |
+| 8 | Moving Target Line | The finish line drifts up and down through a shaded band: get above the top of the band to win early, or be over the line when time runs out |
 | 9 | Unstable Claws | Grips slip and ropes stretch at random; glass shatters on hard hits |
 | 10 | Final Challenge | Wind, the rocking base, magnets and lava together, with the least time |
+
+Every level has its own set of pieces, with shapes you won't find elsewhere: pyramids and crosses against the wind, wide boards for the jelly, grippy cups and stairs for the rocking base, magnetic posts and plates, tall pillars to chase the moving line, glass hexes for the shaky claws.
+
+After any round, **Smash the tower 😈** (on the TV's results or a phone) tucks the results into a small bar so everyone can see the tower while they knock it down.
 
 Beating Level 10 opens the **Endless Remix**: a random mix of two or three of those mechanics, a little harder after every win. A new **Super Claw** power-up can turn up in any game: tap it on your phone and for 20 seconds your claw is faster, quicker on the rope, and grips harder without slipping.
 

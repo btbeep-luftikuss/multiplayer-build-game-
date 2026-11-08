@@ -244,15 +244,27 @@ for (const id of [3]) {
   ok(collapses === 0 && low > h0 - 0.3, `Level 4: a squat tower on the rocking base is measured steadily (${h0.toFixed(2)} m, never below ${low.toFixed(2)} m)`);
 }
 
-console.log('Levels: moving line has no early win');
+console.log('Level 8: win early above the top of the swing, or at the end');
 {
-  const g = new Game({ progress: { unlocked: 8 } });
-  g.addPlayer('a', 'A');
-  g.setLevel(8);
-  g.startRound(); run(g, 3.1);
-  for (let i = 0; i < 12; i++) g.sim.createPiece('stone-cube', 0, 0, g.sim.padTop + 0.5 + i, 0);
+  const mk = () => { const g = new Game({ progress: { unlocked: 8 } }); g.addPlayer('a', 'A'); g.setLevel(8); g.startRound(); run(g, 3.1); return g; };
+  const g = mk(), s = g.sim;
+  for (let i = 0; i < Math.floor(s.finishBase) - 1; i++) s.createPiece('stone-cube', 0, 0, s.padTop + 0.5 + i, 0);
   run(g, 8);
-  ok(g.phase === 'play', 'over the line, but no hold check: only the end counts');
+  ok(g.phase === 'play', `a tower inside the swing (${s.tower.height.toFixed(1)} m) gets no early win`);
+  const g2 = mk(), s2 = g2.sim;
+  for (let i = 0; i < Math.ceil(s2.finishBase + s2.lineAmp) + 1; i++) s2.createPiece('stone-cube', 0, 0, s2.padTop + 0.5 + i, 0);
+  run(g2, 10);
+  ok(g2.phase === 'result' && g2.result.success && g2.result.early, `above the top of the swing (${s2.tower.height.toFixed(1)} m): the hold check runs and the level is won early`);
+}
+
+console.log('Smash the tower after a round');
+{
+  const g = new Game(); g.addPlayer('a', 'A'); g.settings.roundTime = 120; g.startRound(); run(g, 3.1);
+  g.timeLeft = 0.5; run(g, 5.5);
+  ok(g.phase === 'result' && g.smash() && g.smashing && g.statusFor('a').sm, 'the results can be put away to smash the tower (the phones know)');
+  ok(g.sim.claws.get(0).enabled, 'and the claws work again');
+  g.startRound();
+  ok(!g.smashing, 'a new round brings everything back');
 }
 
 console.log(failures ? `\n${failures} check(s) failed` : '\nall level checks passed');

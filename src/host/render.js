@@ -2,7 +2,7 @@
 // seen from the front, a little from above and to the side, with cartoon shading and outlines.
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SHAPES, MATERIALS, PIECES, outlineOf } from '../shared/pieces.js';
+import { SHAPES, MATERIALS, PIECES, outlineOf, extentsOf } from '../shared/pieces.js';
 import { LAYOUT, CLAW } from '../sim/sim.js';
 import * as TX from './textures.js';
 
@@ -373,6 +373,15 @@ export class Renderer {
     this.finishSheet.rotation.x = -Math.PI / 2;
     this.finishSheet.position.set(0, fy, 0);
     fg.add(this.finishSheet);
+    // a drifting line (Level 8): a shaded band showing the whole range it swings through
+    if (sim.lineAmp) {
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(fw, sim.lineAmp * 2), new THREE.MeshBasicMaterial({ color: '#ffd23d', transparent: true, opacity: 0.3, depthWrite: false }));
+      band.position.set(0, sim.padTop + sim.finishBase, -1.2);
+      w.add(band);
+      const topLine = new THREE.Mesh(new THREE.PlaneGeometry(fw, 0.08), new THREE.MeshBasicMaterial({ color: '#ffb000', transparent: true, opacity: 0.8 }));
+      topLine.position.set(0, sim.padTop + sim.finishBase + sim.lineAmp, -1.15);
+      w.add(topLine);
+    }
     this.finishFlags = [];
     for (const sx of [-1, 1]) {
       const flag = new THREE.Group();
@@ -500,8 +509,10 @@ export class Renderer {
     }
     // magnetic blocks wear their pole
     if (def.pole) {
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: TX.letterTexture(def.pole > 0 ? 'N' : 'S'), transparent: true }));
-      plate.position.z = DEPTH / 2 + 0.01;
+      const ex = extentsOf(def.shape, 0);
+      const size = Math.min(0.62, (ex.x1 - ex.x0) * 0.85, (ex.y1 - ex.y0) * 0.85);
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: TX.letterTexture(def.pole > 0 ? 'N' : 'S'), transparent: true }));
+      plate.position.z = (look === 'column' ? (ex.x1 - ex.x0) / 2 : DEPTH / 2) + 0.01; // (on the front of a round post)
       group.add(plate);
     }
     // a string for balloons (drawn from the knot to whatever it's tied to)

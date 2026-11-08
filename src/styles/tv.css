@@ -38,6 +38,11 @@ body.tv { cursor: default; user-select: none; -webkit-user-select: none; }
 #meter .label { margin-top: 1vh; background: var(--paper); border: 0.4vh solid var(--ink); border-radius: 1.4vh; padding: 0 1vh; font-size: 2.2vh; font-weight: 700; white-space: nowrap; }
 #meter .label b { font-size: 3vh; }
 
+#smash-bar { position: absolute; left: 50%; top: 13vh; transform: translateX(-50%); display: none; align-items: center; gap: 1vh; background: rgba(255, 250, 240, 0.95); border: 0.4vh solid var(--ink); border-radius: 2vh; padding: 0.6vh 1.2vh; box-shadow: 0 0.6vh 0 var(--ink); pointer-events: auto; white-space: nowrap; }
+#smash-bar.show { display: flex; }
+#smash-bar .msg { font-size: 2.4vh; font-weight: 800; margin-right: 0.6vh; }
+#smash-bar button { font-family: var(--font); font-weight: 800; font-size: 2vh; color: var(--ink); background: #fff; border: 0.3vh solid var(--ink); border-radius: 1.2vh; padding: 0.3vh 1.2vh; cursor: pointer; }
+#smash-bar button.go { background: var(--sun); }
 #level-chip { position: absolute; left: 50%; top: 13vh; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 0.3vh; pointer-events: none; }
 #level-chip.show { display: flex; }
 #level-chip .name { background: var(--ink); color: #fff; font-size: 2vh; padding: 0.1vh 1.4vh; border-radius: 1.2vh; white-space: nowrap; }

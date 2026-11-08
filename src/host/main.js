@@ -42,6 +42,7 @@ const hud = new Hud(document.getElementById('ui'), {
   start: () => startOrRestart(),
   lobby: () => game.toLobby(),
   next: () => game.nextLevel(),
+  smash: (on) => game.smash(on),
   mode: (m) => game.setMode(m),
   level: (id) => game.setLevel(id),
   setting: (k, v) => { if (game.setSetting(k, v)) store.set('settings', game.settings); },
@@ -134,6 +135,7 @@ function onPhone(cid, m) {
     case 'restart': if (leader && (game.phase === 'play' || game.phase === 'countdown' || game.phase === 'hold')) game.startRound(); break;
     case 'lobby': if (leader && game.phase === 'result') game.toLobby(); break;
     case 'next': if (leader) game.nextLevel(); break;
+    case 'smash': game.smash(m.on !== false); break;
     case 'mode': if (leader) game.setMode(m.m); break;
     case 'level': if (leader) game.setLevel(m.id === 'remix' ? 'remix' : Number(m.id)); break;
     default: break;

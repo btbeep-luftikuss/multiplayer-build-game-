@@ -158,7 +158,7 @@ function onStatus(s) {
   else if (prev?.ph === 'countdown' && s.ph === 'play') { count.textContent = 'GO!'; count.className = 'show go'; setTimeout(() => { if (st.ph === 'play') count.className = ''; }, 900); }
   else if (s.ph !== 'play' || !count.classList.contains('go')) count.className = '';
   $('#pad .inventory').classList.toggle('busy', !!s.sb);
-  if (s.ph !== 'result') result = null;
+  if (s.ph !== 'result') { result = null; resultHidden = false; }
   if (!prev || prev.ph !== s.ph || prev.ld !== s.ld || prev.free !== s.free || prev.lv !== s.lv) { renderLeaderBar(); renderCards(); renderOverlay(); }
 }
 
@@ -293,6 +293,7 @@ const SETTINGS = {
 let menuOpen = false;
 let settingsOpen = false;
 let lvInfo = null;      // Levels mode: which levels there are, which are unlocked and done
+let resultHidden = false; // the results were put away to smash the tower
 
 function renderLeaderBar() {
   const bar = $('#pad .leader-bar');
@@ -302,7 +303,11 @@ function renderLeaderBar() {
     bar.innerHTML = what + (st.ld
       ? `<button class="start">▶ START</button><button class="settings">⚙ ${st.md === 'levels' ? 'Levels' : 'Settings'}</button>`
       : `<div class="wait">Warm up! The leader starts the round.</div>`);
+  } else if (st.ph === 'result' && resultHidden) {
+    bar.innerHTML = `<button class="settings" data-bar="results">🏁 Results</button>` + (st.ld ? `<button class="start" data-bar="again">▶ Again</button>` : '');
   } else bar.innerHTML = '';
+  bar.querySelector('[data-bar=results]')?.addEventListener('click', () => { resultHidden = false; renderOverlay(); renderLeaderBar(); });
+  bar.querySelector('[data-bar=again]')?.addEventListener('click', () => send({ t: 'start' }));
   bar.querySelector('.start')?.addEventListener('click', () => send({ t: 'start' }));
   bar.querySelector('.settings')?.addEventListener('click', () => { settingsOpen = true; renderOverlay(); });
 }
@@ -324,7 +329,7 @@ function renderOverlay() {
       }).join('') + `<button class="lv ${lvInfo.level === 'remix' ? 'sel' : ''}" ${lvInfo.remix ? '' : 'disabled'} data-level="remix">${lvInfo.remix ? '🎲' : '🔒'} Endless Remix${lvInfo.remix ? ` <span class="best">${lvInfo.remixWins} won</span>` : ' <span class="best">beat Level 10</span>'}</button></div>`;
       html += '<button class="big" data-act="close">Done</button>';
     } else html += '<h2>Settings</h2>' + Object.entries(SETTINGS).map(([k, s]) => `<div class="setting"><div class="t">${s.title}</div><div class="opts">${s.opts.map((v) => `<button class="${cfg[k] === v ? 'sel' : ''}" data-set="${k}" data-val='${JSON.stringify(v)}'>${s.show(v)}</button>`).join('')}</div></div>`).join('') + '<button class="big" data-act="close">Done</button>';
-  } else if (st?.ph === 'result' && result && result.lv) {
+  } else if (st?.ph === 'result' && result && result.lv && !resultHidden) {
     const L = result.lv;
     html = `<h2 class="${result.ok ? 'win' : 'lose'}">${result.ok ? 'LEVEL COMPLETE!' : 'LEVEL FAILED'}</h2>` +
       `<p>${L.id === 'remix' ? 'Endless Remix' : 'Level ' + L.id}: ${esc(L.name)}</p>` +
@@ -334,7 +339,7 @@ function renderOverlay() {
         ? (result.ok && L.next ? `<button class="big" data-act="next">${L.next === 'remix' ? 'Endless Remix ▶' : 'Next level ▶'}</button><button data-act="again">Retry</button>` : `<button class="big" data-act="again">Retry</button>`) + `<button data-act="lobby">Level select</button>`
         : `<p class="small">Waiting for the leader…</p>`) +
       `<button data-act="hide">Smash the tower 😈</button>`;
-  } else if (st?.ph === 'result' && result) {
+  } else if (st?.ph === 'result' && result && !resultHidden) {
     html = `<h2 class="${result.ok ? 'win' : 'lose'}">${result.ok ? 'THE TOWER STANDS!' : 'NOT TALL ENOUGH'}</h2>` +
       (result.ok ? `<div class="stars">${[1, 2, 3].map((i) => `<span class="${i <= result.stars ? 'on' : ''}">★</span>`).join('')}</div>` : '') +
       (result.early ? `<p><b>Finished with ${fmtTime(result.left)} to spare!</b></p>` : '') + `<p>${result.h.toFixed(1)} m of ${result.f} m · you placed ${result.placed} piece${result.placed === 1 ? '' : 's'}</p>` +
@@ -366,7 +371,8 @@ $('#overlay').addEventListener('click', (e) => {
     case 'close': settingsOpen = false; menuOpen = false; renderOverlay(); break;
     case 'again': send({ t: 'start' }); break;
     case 'lobby': send({ t: 'lobby' }); break;
-    case 'hide': result = null; renderOverlay(); break;
+    case 'hide': resultHidden = true; send({ t: 'smash', on: true }); renderOverlay(); renderLeaderBar(); break;
+    case 'show-results': resultHidden = false; renderOverlay(); renderLeaderBar(); break;
     case 'restart': if (confirm('Restart the round for everyone?')) send({ t: 'restart' }); menuOpen = false; renderOverlay(); break;
     case 'fullscreen': document.documentElement.requestFullscreen?.().catch(() => {}); menuOpen = false; renderOverlay(); break;
     case 'rename': {
