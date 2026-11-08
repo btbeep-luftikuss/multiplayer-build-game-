@@ -26,7 +26,7 @@
   var small = Math.min(screen.width, screen.height) < 600; // a phone (tablets and touch laptops get asked)
   function load(mode) {
     var s = document.createElement('script');
-    s.src = (mode === 'phone' ? 'phone.js' : 'tv.js') + '?v=82b383d1d0';
+    s.src = (mode === 'phone' ? 'phone.js' : 'tv.js') + '?v=91d1ec287e';
     s.onerror = function () { document.getElementById('boot').textContent = 'Could not load the game. Check your connection and reload.'; };
     document.body.appendChild(s);
   }
@@ -40,14 +40,17 @@
   // a touch screen big enough to be either: ask
   var boot = document.getElementById('boot');
   boot.innerHTML = '<div class="choose"><h1>CLAWSTRUCTION</h1><button data-m="tv">📺 Show the game on this screen</button><button data-m="phone">🎮 Use this screen as a controller</button><p>(Touch controls work on either.)</p></div>';
-  boot.onclick = function (e) {
-    var m = e.target && e.target.getAttribute && e.target.getAttribute('data-m');
-    if (!m) return;
-    q.set(m, '');
-    history.replaceState(null, '', '?' + q.toString().replace(/=(&|$)/g, '$1'));
-    boot.innerHTML = 'Loading Clawstruction…';
-    load(m);
-  };
+  // (a handler on each button: iPad Safari doesn't always pass a tap on up to the box around it)
+  var buttons = boot.querySelectorAll('button');
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].onclick = function () {
+      var m = this.getAttribute('data-m');
+      q.set(m, '');
+      try { history.replaceState(null, '', '?' + q.toString().replace(/=(&|$)/g, '$1')); } catch (err) { /* fine */ }
+      boot.innerHTML = 'Loading Clawstruction…';
+      load(m);
+    };
+  }
 })();
 </script>
 </body>

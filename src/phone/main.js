@@ -97,7 +97,7 @@ function join() {
   link = joinRoom({
     code, local, hello: { cid, name },
     onMessage: onMessage,
-    onStatus: (s) => { connState = s; renderOverlay(); },
+    onStatus: (s, detail) => { connState = s; connDetail = detail || (s === 'open' ? 'hello' : connDetail); if (s === 'connecting' && !connSince) connSince = Date.now(); renderOverlay(); },
     onClose: () => { connState = 'reconnecting'; renderOverlay(); },
   });
   show('pad');
@@ -116,6 +116,7 @@ function onMessage(m) {
   switch (m.t) {
     case 'welcome':
       me = m;
+      connSince = 0;
       document.documentElement.style.setProperty('--me', m.color);
       $('#pad .nm').textContent = m.name;
       connState = 'open';
@@ -225,7 +226,7 @@ function stick(el) {
   el.addEventListener('pointerdown', (e) => {
     if (id !== null) return;
     id = e.pointerId;
-    el.setPointerCapture(id);
+    try { el.setPointerCapture(id); } catch { /* some browsers refuse; the pad still works without it */ }
     const r = el.getBoundingClientRect();
     x0 = e.clientX; y0 = e.clientY;
     el.classList.add('active');
@@ -292,6 +293,8 @@ const SETTINGS = {
 };
 let menuOpen = false;
 let settingsOpen = false;
+let connDetail = '';   // how far the connection got: server, tv, hello
+let connSince = 0;
 let lvInfo = null;      // Levels mode: which levels there are, which are unlocked and done
 let resultHidden = false; // the results were put away to smash the tower
 
@@ -318,7 +321,16 @@ function renderOverlay() {
   if (connState === 'full') html = `<h2>The game is full</h2><p>Eight claws are already taken. Try again when someone leaves.</p><button class="big" data-act="retry">Try again</button>`;
   else if (connState === 'noroom') html = `<h2>No game with code ${esc(cleanCode(codeIn.value))}</h2><p>Check the code on the TV. Still trying…</p><button data-act="code">Change the code</button>`;
   else if (connState === 'offline') html = `<h2>Can't reach the internet</h2><p>Phones need Wi-Fi or data to find the TV. Still trying…</p><button data-act="code">Change the code</button>`;
-  else if (connState === 'connecting' || connState === 'reconnecting' || (connState === 'open' && !me)) html = `<div class="spinner"></div><h2>${connState === 'reconnecting' ? 'Reconnecting…' : 'Connecting to the TV…'}</h2><button data-act="code">Change the code</button>`;
+  else if (connState === 'connecting' || connState === 'reconnecting' || (connState === 'open' && !me)) {
+    // say which step it's on, so a stuck connection can be told apart
+    const steps = [['server', 'Reaching the game server'], ['tv', `Looking for the TV (room ${esc(cleanCode(codeIn.value))})`], ['hello', 'Connected: waiting for the TV to answer']];
+    const at = connState === 'open' ? 2 : Math.max(0, steps.findIndex(([k]) => k === connDetail));
+    const slow = connSince && Date.now() - connSince > 20000;
+    html = `<div class="spinner"></div><h2>${connState === 'reconnecting' ? 'Reconnecting…' : 'Connecting to the TV…'}</h2>` +
+      `<ol class="steps">${steps.map(([, t], i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}">${t}</li>`).join('')}</ol>` +
+      (slow ? `<p class="small">${at === 0 ? 'The game server can\'t be reached: check this device\'s Wi-Fi, and try turning off a VPN, Private Relay or content blocker.' : at === 1 ? 'The TV isn\'t answering: check the room code on the TV, and that the TV page is still open.' : 'The TV saw you but hasn\'t answered: reload the TV page and try again.'}</p>` : '') +
+      `<button data-act="retry">Try again</button><button data-act="code">Change the code</button>`;
+  }
   else if (settingsOpen && st?.ld && cfg) {
     const mode = lvInfo?.mode || 'free';
     html = `<h2>Game mode</h2><div class="setting"><div class="opts"><button class="${mode === 'free' ? 'sel' : ''}" data-mode="free">Free Play</button><button class="${mode === 'levels' ? 'sel' : ''}" data-mode="levels">Levels</button></div></div>`;
@@ -365,7 +377,7 @@ $('#overlay').addEventListener('click', (e) => {
   if (t.dataset.mode) { send({ t: 'mode', m: t.dataset.mode }); if (lvInfo) lvInfo = { ...lvInfo, mode: t.dataset.mode }; renderOverlay(); return; }
   if (t.dataset.level) { const id = t.dataset.level === 'remix' ? 'remix' : Number(t.dataset.level); send({ t: 'level', id }); if (lvInfo) lvInfo = { ...lvInfo, mode: 'levels', level: id }; renderOverlay(); return; }
   switch (t.dataset.act) {
-    case 'retry': join(); break;
+    case 'retry': connSince = 0; join(); break;
     case 'next': send({ t: 'next' }); break;
     case 'code': link?.close(); link = null; me = null; connState = 'idle'; menuOpen = false; renderOverlay(); show('join'); break;
     case 'close': settingsOpen = false; menuOpen = false; renderOverlay(); break;
@@ -385,6 +397,8 @@ $('#overlay').addEventListener('click', (e) => {
   }
 });
 
+setInterval(() => { if (connSince && !me && link) renderOverlay(); }, 5000);
+
 // ---------- little things ----------
 
 let toastTimer = 0;
@@ -402,6 +416,15 @@ async function keepAwake() {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && link) keepAwake(); });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// if anything goes wrong, say so on screen (an error on a phone is otherwise invisible)
+function showError(msg) {
+  let bar = document.getElementById('err-bar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'err-bar'; document.body.appendChild(bar); bar.onclick = () => bar.remove(); }
+  bar.textContent = `Something went wrong: ${String(msg).slice(0, 160)} (tap to hide)`;
+}
+addEventListener('error', (e) => showError(e.message || e.error || 'unknown error'));
+addEventListener('unhandledrejection', (e) => showError((e.reason && e.reason.message) || e.reason || 'unknown error'));
 
 // ---------- on a computer: the keyboard works too ----------
 // arrows or WASD move the claw and the rope, Space grabs, X drops, Q/E turn, 1–9 take a piece

@@ -175,9 +175,9 @@ function peerClient(code, hello, h) {
   };
 
   const start = () => {
-    h.onStatus?.('connecting');
+    h.onStatus?.('connecting', 'server');
     peer = new Peer({ config: { iceServers: ICE }, debug: 1 });
-    peer.on('open', connect);
+    peer.on('open', () => { h.onStatus?.('connecting', 'tv'); connect(); });
     peer.on('disconnected', () => { if (!closed) setTimeout(() => { if (!closed && !peer.destroyed) peer.reconnect(); }, 1000); });
     peer.on('error', (err) => {
       if (closed) return;

@@ -151,9 +151,15 @@ body.has-keys .keys-hint { display: block; }
 .sheet .rename { display: flex; gap: 6px; align-items: center; font-weight: 700; }
 .sheet .rename input { flex: 1; min-width: 0; font-family: var(--font); font-size: 18px; font-weight: 700; padding: 6px 10px; border-radius: 10px; border: 3px solid #000; }
 .sheet .help { text-align: left; font-size: 14px; line-height: 1.35; background: var(--ink2); border-radius: 14px; padding: 10px 12px; opacity: 0.9; }
+.sheet .steps { text-align: left; margin: 0 auto; padding-left: 22px; font-size: 16px; font-weight: 600; opacity: 0.9; }
+.sheet .steps li { opacity: 0.45; }
+.sheet .steps li.done { opacity: 0.9; color: #5dff8a; }
+.sheet .steps li.done::marker { content: '✓ '; }
+.sheet .steps li.now { opacity: 1; font-weight: 800; }
 .spinner { width: 54px; height: 54px; margin: 0 auto; border-radius: 50%; border: 7px solid rgba(255, 255, 255, 0.2); border-top-color: var(--me); animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+#err-bar { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 20; background: #ff4d5e; color: #fff; font-weight: 700; font-size: 14px; padding: 8px 10px; border-radius: 12px; border: 3px solid #000; }
 #toast { position: fixed; left: 12px; right: 12px; top: 54px; z-index: 12; background: var(--paper); color: var(--ink); border: 3px solid #000; border-radius: 16px; padding: 8px 12px; font-weight: 700; font-size: 16px; text-align: center; transform: translateY(-140%); opacity: 0; transition: transform 0.25s, opacity 0.25s; pointer-events: none; }
 #toast.show { transform: none; opacity: 1; }
 #toast.big { background: linear-gradient(135deg, #fff3a8, #ffd1f0); font-size: 18px; box-shadow: 0 0 0 4px var(--me); }
