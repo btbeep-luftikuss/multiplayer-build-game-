@@ -95,7 +95,7 @@ function join() {
   connState = 'connecting';
   renderOverlay();
   link = joinRoom({
-    code, local, hello: { cid, name },
+    code, local, hello: { cid, name }, relays: params.get('relay') ? params.get('relay').split(',') : undefined,
     onMessage: onMessage,
     onStatus: (s, detail) => { connState = s; connDetail = detail || (s === 'open' ? 'hello' : connDetail); if (s === 'connecting' && !connSince) connSince = Date.now(); renderOverlay(); },
     onClose: () => { connState = 'reconnecting'; renderOverlay(); },
@@ -324,6 +324,7 @@ function renderOverlay() {
   else if (connState === 'connecting' || connState === 'reconnecting' || (connState === 'open' && !me)) {
     // say which step it's on, so a stuck connection can be told apart
     const steps = [['server', 'Reaching the game server'], ['tv', `Looking for the TV (room ${esc(cleanCode(codeIn.value))})`], ['hello', 'Connected: waiting for the TV to answer']];
+    if (connDetail === 'relay') steps[1] = ['relay', `Trying the backup route to the TV (room ${esc(cleanCode(codeIn.value))})`];
     const link = connDetail.startsWith('link:') ? connDetail.slice(5) : '';
     const at = connState === 'open' ? 2 : link ? 1 : Math.max(0, steps.findIndex(([k]) => k === connDetail));
     const slow = connSince && Date.now() - connSince > 20000;

@@ -6,6 +6,13 @@
 // For testing on one computer there is also a "local" transport (BroadcastChannel between tabs),
 // used when the page has ?local in its address. Both transports call the same callbacks.
 import { Peer } from 'peerjs';
+import { Mqtt } from './mqtt.js';
+
+// The backup route (when the phone and the TV can't get a WebRTC line): free public MQTT brokers pass
+// the messages along. The TV listens on all of them; a phone tries them one after another.
+export const RELAYS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081'];
+const topicFor = (code) => `clawstruction/v1/${String(code).toLowerCase()}`;
+const uid = () => Math.random().toString(36).slice(2, 10);
 
 const PREFIX = 'clawstruction-v1-';
 export const CODE_LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I or O (they look like 1 and 0)
@@ -31,8 +38,78 @@ const peerIdFor = (code) => PREFIX + code.toLowerCase();
 
 // handlers: onReady(code), onJoin(cid, hello), onMessage(cid, msg), onLeave(cid), onStatus(text)
 // keep: the code was this TV's before a reload, so phones may still be using it; try hard to get it back
-export function createHost({ code, local, keep = false, ...h }) {
-  return local ? localHost(code, h) : peerHost(code, keep, h);
+export function createHost({ code, local, keep = false, relays = RELAYS, ...h }) {
+  return local ? localHost(code, h) : comboHost(code, keep, relays, h);
+}
+
+// the TV on both routes at once: each phone is answered on the route it last spoke on
+function comboHost(code, keep, relays, h) {
+  const via = new Map(); // cid -> 'peer' | 'relay'
+  let peerState = 'connecting', relayUp = false;
+  const status = () => h.onStatus?.(peerState === 'ready' || relayUp ? 'ready' : peerState);
+  let relay = null;
+  const peer = peerHost(code, keep, {
+    onReady: (c) => { relay?.setCode(c); h.onReady?.(c); },
+    onJoin: (cid, m) => { via.set(cid, 'peer'); h.onJoin?.(cid, m); },
+    onMessage: (cid, m) => { via.set(cid, 'peer'); h.onMessage?.(cid, m); },
+    onLeave: (cid) => { if (via.get(cid) === 'peer') { via.delete(cid); h.onLeave?.(cid); } },
+    onStatus: (s) => { peerState = s; status(); },
+  });
+  relay = relayHost(peer.code, relays, {
+    onReady: () => { if (!relayUp) { relayUp = true; h.onReady?.(peer.code); status(); } },
+    onJoin: (cid, m) => { via.set(cid, 'relay'); h.onJoin?.(cid, m); },
+    onMessage: (cid, m) => { via.set(cid, 'relay'); h.onMessage?.(cid, m); },
+    onLeave: (cid) => { if (via.get(cid) === 'relay') { via.delete(cid); h.onLeave?.(cid); } },
+  });
+  return {
+    get code() { return peer.code; },
+    send(cid, msg, droppable = false) { (via.get(cid) === 'relay' ? relay : peer).send(cid, msg, droppable); },
+    drop(cid) { peer.drop(cid); },
+    close() { peer.close(); relay.close(); },
+  };
+}
+
+function relayHost(code, relays, h) {
+  const route = new Map(); // cid -> { m: the broker it's on, seen }
+  const subscribeAll = () => { for (const m of brokers) m.subscribe(topicFor(code) + '/h'); };
+  const brokers = relays.map((url) => {
+    const m = new Mqtt(url, {
+      clientId: 'claw-tv-' + uid(),
+      onReady: () => h.onReady?.(),
+      onMessage: (topic, text) => {
+        if (topic !== topicFor(code) + '/h' || text.length > 4000) return;
+        let p;
+        try { p = JSON.parse(text); } catch { return; }
+        if (!p || typeof p.cid !== 'string' || p.cid.length > 40 || !p.msg || typeof p.msg !== 'object') return;
+        const known = route.get(p.cid);
+        if (p.msg.t === 'hello') { route.set(p.cid, { m, seen: Date.now() }); h.onJoin?.(p.cid, p.msg); return; }
+        if (!known) return;
+        known.m = m; known.seen = Date.now();
+        h.onMessage?.(p.cid, p.msg);
+      },
+    });
+    return m;
+  });
+  subscribeAll();
+  // phones ping every second: a silent one has gone
+  const timer = setInterval(() => {
+    const now = Date.now();
+    for (const [cid, r] of route) if (now - r.seen > 6000) { route.delete(cid); h.onLeave?.(cid); }
+  }, 1000);
+  return {
+    setCode(c) {
+      if (c === code) return;
+      for (const m of brokers) m.unsubscribe(topicFor(code) + '/h');
+      code = c;
+      subscribeAll();
+    },
+    send(cid, msg, droppable = false) {
+      const r = route.get(cid);
+      if (!r || (droppable && r.m.backlog > BACKLOG)) return;
+      r.m.publish(`${topicFor(code)}/c/${cid}`, JSON.stringify(msg));
+    },
+    close() { clearInterval(timer); for (const m of brokers) m.close(); },
+  };
 }
 
 function peerHost(code, keep, h) {
@@ -130,8 +207,80 @@ function localHost(code, h) {
 
 // handlers: onOpen(), onMessage(msg), onClose(), onStatus(state, detail)
 // state: 'connecting' | 'open' | 'reconnecting' | 'noroom' | 'offline'
-export function joinRoom({ code, local, hello, ...h }) {
-  return local ? localClient(code, hello, h) : peerClient(code, hello, h);
+export function joinRoom({ code, local, hello, relays = RELAYS, ...h }) {
+  return local ? localClient(code, hello, h) : comboClient(code, hello, relays, h);
+}
+
+// a phone: WebRTC first; if the TV hasn't answered within 8 s (or that route can't work), the backup
+// route too. Whichever route the TV last answered on is the one the phone talks on.
+function comboClient(code, hello, relays, h) {
+  let active = null, relay = null, closed = false;
+  const fromPeer = (msg) => { active = peer; h.onMessage?.(msg); };
+  const startRelay = () => {
+    if (relay || closed || !relays.length) return;
+    h.onStatus?.('connecting', 'relay');
+    relay = relayClient(code, hello, relays, {
+      onMessage: (msg) => { active = relay; h.onMessage?.(msg); },
+      onStatus: (s, d) => { if (active !== peer) h.onStatus?.(s, d); },
+      onClose: () => { if (active === relay) { active = null; h.onClose?.(); } },
+    });
+  };
+  const peer = peerClient(code, hello, {
+    onMessage: fromPeer,
+    onOpen: () => h.onOpen?.(),
+    onClose: () => { if (active === peer) { active = null; h.onClose?.(); } },
+    onStatus: (s, d) => {
+      if (s === 'noroom' || s === 'offline') startRelay();
+      // once the backup route is trying, its news is what matters (unless this line works)
+      if (!relay || s === 'open' || active === peer) h.onStatus?.(s, d);
+    },
+  });
+  const fallback = setTimeout(() => { if (!active) startRelay(); }, 8000);
+  return {
+    send(msg) { (active || peer).send(msg); },
+    get open() { return !!active; },
+    close() { closed = true; clearTimeout(fallback); peer.close(); relay?.close(); },
+  };
+}
+
+function relayClient(code, hello, relays, h) {
+  const cid = hello.cid;
+  let i = -1, m = null, heard = 0, tried = 0, closed = false, open = false;
+  const base = topicFor(code);
+  const post = (msg) => m && m.publish(base + '/h', JSON.stringify({ cid, msg }));
+  const next = () => {
+    if (closed) return;
+    m?.close();
+    i = (i + 1) % relays.length;
+    tried = Date.now();
+    m = new Mqtt(relays[i], {
+      clientId: 'claw-pad-' + uid(),
+      onReady: () => { m.subscribe(`${base}/c/${cid}`); post({ ...hello, t: 'hello', v: PROTOCOL }); },
+      onMessage: (topic, text) => {
+        let msg;
+        try { msg = JSON.parse(text); } catch { return; }
+        if (!msg || typeof msg !== 'object') return;
+        heard = Date.now();
+        if (!open) { open = true; h.onStatus?.('open'); }
+        h.onMessage?.(msg);
+      },
+    });
+  };
+  next();
+  const timer = setInterval(() => {
+    if (closed) return;
+    const now = Date.now();
+    if (open && now - heard > 6000) { open = false; h.onClose?.(); h.onStatus?.('reconnecting', 'relay'); }
+    if (!open) {
+      // no answer on this broker: say hello again, and after a while try the next one
+      if (m && m.ready) post({ ...hello, t: 'hello', v: PROTOCOL });
+      if (now - Math.max(tried, heard) > 9000) next();
+    } else post({ t: 'ping' });
+  }, 1000);
+  return {
+    send(msg) { if (open) post(msg); },
+    close() { closed = true; clearInterval(timer); if (m) { post({ t: 'bye' }); m.close(); } },
+  };
 }
 
 function peerClient(code, hello, h) {

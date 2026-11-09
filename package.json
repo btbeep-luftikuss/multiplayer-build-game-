@@ -10,10 +10,12 @@
     "test": "node tests/physics.test.mjs && node tests/game.test.mjs && node tests/levels.test.mjs && node tests/chaos.test.mjs && node tests/chaos-levels.test.mjs"
   },
   "devDependencies": {
+    "aedes": "^1.2.0",
     "esbuild": "0.28.2",
     "peerjs": "1.5.5",
     "planck": "1.5.1",
     "qrcode-generator": "2.0.4",
-    "three": "0.187.0"
+    "three": "0.187.0",
+    "ws": "^8.22.2"
   }
 }

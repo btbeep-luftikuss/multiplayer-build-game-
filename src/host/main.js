@@ -97,11 +97,14 @@ function joinUrl(c) {
   u.hash = '';
   u.searchParams.set('join', c);
   if (local) u.searchParams.set('local', '');
+  if (params.get('relay')) u.searchParams.set('relay', params.get('relay'));
   return u.toString().replace(/=(&|$)/g, '$1');
 }
 
+// ?relay=wss://… (comma-separated) uses other MQTT brokers for the backup route (tests use a local one)
+const relays = params.get('relay') ? params.get('relay').split(',') : undefined;
 const net = createHost({
-  code, local, keep: savedCode.length === 4,
+  code, local, relays, keep: savedCode.length === 4,
   onReady: (c) => { code = c; session.set('room', c); hud.setJoin(joinUrl(c), c); },
   onJoin: (cid, hello) => {
     const p = game.addPlayer(cid, hello.name);

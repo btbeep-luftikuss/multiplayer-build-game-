@@ -79,7 +79,7 @@ The game is a static website, so GitHub Pages can host it for free:
 2. Under **Build and deployment**, choose **Deploy from a branch**, pick the **main** branch and the **/docs** folder, and save.
 3. After a minute the game is at `https://<your-user>.github.io/<this-repo>/`. Open that on the TV and scan the QR code with your phones.
 
-Phones and the TV find each other through PeerJS's free public server, then talk directly (WebRTC), so they don't even have to be on the same Wi-Fi. They do all need internet access.
+Phones and the TV find each other through PeerJS's free public server, then talk directly (WebRTC), so they don't even have to be on the same Wi-Fi. If that route can't be set up (some networks, or that server misbehaving), a controller falls back after a few seconds to a backup route through free public MQTT brokers (EMQX, HiveMQ, Mosquitto), which the TV always listens on too. Everyone does need internet access.
 
 ## Development
 
@@ -88,6 +88,7 @@ npm install
 npm run dev      # rebuilds on change, serves http://localhost:8080
 npm test         # physics and game-rule checks in Node
 node tests/browser.cjs   # optional: plays through the TV and two phones in Chromium (needs Playwright and the dev server)
+node tests/relay-server.mjs   # optional: a local MQTT broker for trying the backup route (?relay=ws://localhost:1884 on the TV)
 npm run build    # bundles into docs/ (commit docs/ so GitHub Pages serves it)
 ```
 
