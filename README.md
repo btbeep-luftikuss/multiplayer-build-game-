@@ -15,7 +15,7 @@ The **TV** (any big screen with a web browser, such as a laptop plugged into the
 
 ### Levels mode
 
-Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play** to **Levels**: ten handcrafted challenges, each with its own time limit, height goal, pieces and mechanics. Beat a level to unlock the next. The level select shows which levels are done and the team's best time for each; progress is saved on the TV.
+Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play** to **Levels**: twenty handcrafted challenges, each with its own time limit, height goal, pieces and mechanics. Beat a level to unlock the next. The level select shows which levels are done and the team's best time for each; progress is saved on the TV.
 
 | # | Level | What's new |
 |---|---|---|
@@ -29,12 +29,22 @@ Switch the TV lobby (or the first player's ⚙ on their phone) from **Free Play*
 | 8 | Moving Target Line | The finish line drifts up and down through a shaded band: get above the top of the band to win early, or be over the line when time runs out |
 | 9 | Unstable Claws | Grips slip and ropes stretch at random; glass shatters on hard hits |
 | 10 | Final Challenge | Wind, the rocking base, magnets and lava together, with the least time |
+| 11 | Frozen Lake | Everything slides on the ice, except pink rubber; cups and stairs hold what sits in them |
+| 12 | Hillside | The ground slopes uphill to the right: Levellers (sloped underneath to match) give the tower a flat start, and balls roll away |
+| 13 | Conveyor Belt | The pad is a belt that runs one way, slows and runs back, carrying the tower with it (and anything left near the ends off them) |
+| 14 | Earthquake | A warning, then a few seconds of shaking every 20 seconds or so: wide, heavy, neat towers ride it out, towers on stilts don't |
+| 15 | Twin Towers | Two rooftops, and BOTH towers have to reach the line (the TV shows each one's height) |
+| 16 | Meteor Shower | A red target shows where each fireball will land: it burns wood and knocks whatever it hits, unless a claw is held over the target to block it |
+| 17 | Bridge the Gap | Two cliffs and a bottomless chasm; only what's built over the gap counts, so bridge it and build up from the middle (pieces that fall in come back to your kit) |
+| 18 | Lights Out | Night: claws carry lamps, glow blocks light up the tower, and lightning flashes now and then |
+| 19 | Mixed-Up Claws | Every so often someone's controls flip (left is right, sometimes up is down) for nine seconds; their phone shows it |
+| 20 | Grand Finale | Night, earthquakes, meteors and mixed-up controls all at once |
 
-Every level has its own set of pieces, with shapes you won't find elsewhere: pyramids and crosses against the wind, wide boards for the jelly, grippy cups and stairs for the rocking base, magnetic posts and plates, tall pillars to chase the moving line, glass hexes for the shaky claws.
+Every level has its own set of pieces, with shapes you won't find elsewhere: pyramids and crosses against the wind, wide boards for the jelly, grippy cups and stairs for the rocking base, magnetic posts and plates, tall pillars to chase the moving line, glass hexes for the shaky claws, grip mats for the ice, Levellers for the hill, barrels and pallets on the conveyor, big blocks against the quakes, steel roofs against the meteors, 5 m bridge beams for the chasm and glowing blocks for the night.
 
 After any round, **Smash the tower 😈** (on the TV's results or a phone) tucks the results into a small bar so everyone can see the tower while they knock it down.
 
-Beating Level 10 opens the **Endless Remix**: a random mix of two or three of those mechanics, a little harder after every win. A new **Super Claw** power-up can turn up in any game: tap it on your phone and for 20 seconds your claw is faster, quicker on the rope, and grips harder without slipping.
+Beating Level 10 also opens the **Endless Remix**: a random mix of two or three of the levels' mechanics (never two kinds of moving ground at once), a little harder after every win. A new **Super Claw** power-up can turn up in any game: tap it on your phone and for 20 seconds your claw is faster, quicker on the rope, and grips harder without slipping.
 
 ### Playing from a computer
 
@@ -86,8 +96,8 @@ Phones and the TV find each other through PeerJS's free public server, then talk
 ```sh
 npm install
 npm run dev      # rebuilds on change, serves http://localhost:8080
-npm test         # physics and game-rule checks in Node
-node tests/browser.cjs   # optional: plays through the TV and two phones in Chromium (needs Playwright and the dev server)
+npm test         # physics, game-rule and level checks in Node (every level is also played by random button-mashers, looking for glitches)
+node tests/browser.cjs   # optional: plays through the TV and two phones in Chromium, then every level with its hazards (needs Playwright and the dev server)
 node tests/relay-server.mjs   # optional: a local MQTT broker for trying the backup route (?relay=ws://localhost:1884 on the TV)
 npm run build    # bundles into docs/ (commit docs/ so GitHub Pages serves it)
 ```
@@ -102,4 +112,4 @@ To try it on one computer without phones, open `http://localhost:8080/?local` (t
 - `src/phone/`: the controller.
 - `src/net/net.js`: [PeerJS](https://peerjs.com/) rooms (the TV hosts, phones connect), plus a same-computer mode for testing.
 - `src/shared/pieces.js`: all the pieces, materials and kits.
-- `src/shared/levels.js`: the ten levels and the remix: time, height, pieces and mechanics.
+- `src/shared/levels.js`: the twenty levels and the remix: time, height, pieces and mechanics.

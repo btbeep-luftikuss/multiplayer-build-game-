@@ -54,6 +54,8 @@ body.tv { cursor: default; user-select: none; -webkit-user-select: none; }
 #level-intro .goal { margin-top: 0.6vh; font-size: 2.2vh; }
 #zone-label { position: absolute; left: 0; top: 0; display: none; color: #fff; background: rgba(130, 70, 220, 0.85); border: 0.3vh solid var(--ink); border-radius: 1.2vh; padding: 0.1vh 1.2vh; font-size: 2vh; font-weight: 800; white-space: nowrap; }
 #zone-label.show { display: block; }
+#gap-label { position: absolute; left: 0; top: 0; display: none; color: #2a2a2a; background: rgba(255, 210, 61, 0.92); border: 0.3vh solid var(--ink); border-radius: 1.2vh; padding: 0.1vh 1.2vh; font-size: 1.8vh; font-weight: 800; white-space: nowrap; }
+#gap-label.show { display: block; }
 #finish-label, #height-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-weight: 800; }
 #finish-label { font-size: 2.4vh; color: #fff; background: var(--ink); padding: 0.2vh 1.2vh; border-radius: 1.2vh; }
 #finish-label.over { background: var(--good); color: var(--ink); }
@@ -132,8 +134,8 @@ body.tv { cursor: default; user-select: none; -webkit-user-select: none; }
 #lobby .levels-box { display: none; margin-top: 1vh; }
 #lobby.mode-levels .levels-box { display: block; }
 #lobby.mode-levels .settings-box { display: none; }
-#lobby .level-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.6vh; }
-#lobby .level-grid .lv { position: relative; height: 6.4vh; padding: 0.2vh; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; box-shadow: 0 0.3vh 0 var(--ink); border-width: 0.3vh; }
+#lobby .level-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5vh; }
+#lobby .level-grid .lv { position: relative; height: 5.6vh; padding: 0.2vh; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; box-shadow: 0 0.3vh 0 var(--ink); border-width: 0.3vh; }
 #lobby .level-grid .lv .num { font-size: 2.2vh; }
 #lobby .level-grid .lv .ic { font-size: 2vh; }
 #lobby .level-grid .lv .tick { position: absolute; left: 0; right: 0; bottom: -0.2vh; font-size: 1.3vh; color: #1f9d55; }

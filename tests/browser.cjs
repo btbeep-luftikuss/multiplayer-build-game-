@@ -91,6 +91,31 @@ const ok = (cond, msg) => { console.log(`${cond ? '  ok ' : 'FAIL '} ${msg}`); i
   await ana.screenshot({ path: path.join(out, 'phone-result.png') });
   ok(await ana.isVisible('#overlay [data-act=again]'), 'the leader can play again from their phone');
 
+  // every level (and the remix) on the real TV, with its hazards made to happen straight away:
+  // the TV and the phones must cope with all of them
+  const ids = await tv.evaluate(() => {
+    const g = window.__claw.game;
+    const levels = {}; for (let i = 1; i <= 20; i++) levels[i] = { done: true, best: 99 };
+    Object.assign(g.progress, { unlocked: 20, levels });
+    return [...Array(20).keys()].map((i) => i + 1).concat(['remix']);
+  });
+  for (const id of ids) {
+    await tv.evaluate((id) => {
+      const g = window.__claw.game;
+      g.toLobby(); g.setLevel(id); g.startRound();
+      g.setPhase('play'); // (straight in, no countdown)
+      const s = g.sim;
+      for (let i = 0; i < 4; i++) s.createPiece(g.level.pool[i % g.level.pool.length][0], 0, (i % 2) * 0.4, s.padTop + 0.8 + i * 1.5, 0);
+      if (s.quake) s.quake.next = s.time + 2.6;
+      if (s.meteor) s.meteor.next = s.time + 2.3;
+      if (s.mods.mixup) s.mixNext = s.time + 0.2;
+      if (s.mods.dark) s.boltNext = s.time + 0.5;
+    }, id);
+    await sleep(id === 'remix' ? 3000 : 2200);
+  }
+  await tv.screenshot({ path: path.join(out, 'tv-levels.png') });
+  ok(await tv.evaluate(() => window.__claw.game.level.name === 'Endless Remix'), 'every level loads and plays on the TV, hazards and all');
+
   ok(errors.length === 0, `no errors${errors.length ? ': ' + errors.slice(0, 5).join(' | ') : ''}`);
   await browser.close();
   console.log(failures ? `\n${failures} check(s) failed` : '\nbrowser test passed');

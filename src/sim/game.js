@@ -2,7 +2,7 @@
 // check, power-ups, refills and the end-of-round results. Everything physical lives in sim.js.
 import { Sim, STEP } from './sim.js';
 import { KITS, PIECES, SPECIAL_IDS, PLAYER_COLORS } from '../shared/pieces.js';
-import { LEVELS, levelById, levelHeight, remixLevel } from '../shared/levels.js';
+import { LEVELS, REMIX_AFTER, levelById, levelHeight, remixLevel } from '../shared/levels.js';
 
 export const MAX_PLAYERS = 8;
 export const DEFAULT_SETTINGS = { roundTime: 240, difficulty: 'normal', powerups: true };
@@ -47,6 +47,8 @@ export function cleanProgress(p) {
     if (r && r.done) out.levels[l.id] = { done: true, best: Number.isFinite(r.best) ? r.best : null };
   }
   if (p.remix) out.remix = { wins: Math.max(0, Number(p.remix.wins) | 0), best: Number.isFinite(p.remix.best) ? p.remix.best : null };
+  // every level after the last one beaten is open (progress saved when there were fewer levels)
+  for (const l of LEVELS) if (out.levels[l.id] && l.id < LEVELS.length) out.unlocked = Math.max(out.unlocked, l.id + 1);
   return out;
 }
 
@@ -214,7 +216,7 @@ export class Game {
 
   // ---------- free play or levels ----------
 
-  get remixUnlocked() { return !!this.progress.levels[LEVELS.length]?.done; }
+  get remixUnlocked() { return !!this.progress.levels[REMIX_AFTER]?.done; }
   levelAvailable(id) { return id === 'remix' ? this.remixUnlocked : Number.isInteger(id) && id >= 1 && id <= this.progress.unlocked; }
 
   // the level being played (null in free play)
@@ -387,6 +389,7 @@ export class Game {
       sim.lavaY = -0.6 + (sim.lavaTop + 0.6) * k;
     }
     sim.lineFrozen = this.phase === 'judge' || this.phase === 'result';
+    sim.hazards = this.phase === 'play';
 
     this.sim.step(dt);
     for (const e of this.sim.drainEvents()) this.onSimEvent(e);
@@ -460,6 +463,9 @@ export class Game {
       }
       const dropper = bySlot(e.releasedBy);
       if (dropper && this.phase === 'play') dropper.stats.lost++;
+    } else if (e.type === 'flip') {
+      const p = bySlot(e.slot);
+      if (p) this.toast(p, `🔀 Your controls are flipped: left is right${e.both ? ' and up is down' : ''}!`, true);
     } else if (e.type === 'collapse') {
       if (this.phase === 'play' && this.powerupsOn() && this.elapsed - this.lastRescue > 25 && this.timeLeft > 20) {
         this.lastRescue = this.elapsed;
@@ -535,14 +541,16 @@ export class Game {
       r.next = 'remix';
     } else {
       const rec = pr.levels[id] || { done: false, best: null };
+      const wasRemix = this.remixUnlocked;
       r.newBest = rec.best === null || time < rec.best;
       pr.levels[id] = { done: true, best: r.newBest ? time : rec.best };
       if (id < LEVELS.length) {
         r.unlocked = id + 1 > pr.unlocked ? id + 1 : null;
         pr.unlocked = Math.max(pr.unlocked, id + 1);
         r.next = id + 1;
+        if (id === REMIX_AFTER && !wasRemix) r.remixOpen = true;
       } else {
-        r.unlocked = 'remix';
+        r.allDone = true;
         r.next = 'remix';
       }
     }
@@ -583,6 +591,7 @@ export class Game {
       sm: !!this.smashing,
       lv: this.level ? `${this.levelId === 'remix' ? 'Remix' : 'Level ' + this.levelId}: ${this.level.name}` : '',
       bo: c ? Math.max(0, Math.ceil(c.boostUntil - this.sim.time)) : 0,
+      fx: c && c.flipUntil > this.sim.time ? (c.flipBoth ? 2 : 1) : 0,
     };
   }
 

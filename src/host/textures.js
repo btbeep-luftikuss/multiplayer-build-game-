@@ -362,3 +362,49 @@ export function toonRamp() {
   cache.set('ramp', t);
   return t;
 }
+
+// a conveyor belt's top: dark rubber with yellow chevrons (one per metre; it scrolls)
+export function beltTexture() {
+  if (cache.has('belt')) return cache.get('belt');
+  const [c, g] = canvas(128);
+  g.fillStyle = '#34343f'; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#2a2a33'; for (let i = 0; i < 128; i += 16) g.fillRect(i, 0, 3, 128);
+  g.fillStyle = '#ffc21a';
+  g.beginPath(); g.moveTo(30, 18); g.lineTo(70, 64); g.lineTo(30, 110); g.lineTo(52, 110); g.lineTo(92, 64); g.lineTo(52, 18); g.closePath(); g.fill();
+  const t = finish(c);
+  cache.set('belt', t);
+  return t;
+}
+
+// the front of a building (Twin Towers): rows of lit windows
+export function windowsTexture(color = '#c6dcf7') {
+  const key = 'windows' + color;
+  if (cache.has(key)) return cache.get(key);
+  const [c, g] = canvas(128);
+  g.fillStyle = color; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(0, 0, 128, 6);
+  for (let y = 22; y < 128; y += 44) for (let x = 14; x < 128; x += 38) {
+    g.fillStyle = '#3a4a6a'; g.fillRect(x - 2, y - 2, 26, 30);
+    g.fillStyle = (x + y) % 3 ? '#fff6c8' : '#9fd0ff'; g.fillRect(x, y, 22, 26);
+  }
+  const t = finish(c);
+  cache.set(key, t);
+  return t;
+}
+
+// the night sky (Lights Out): deep blue with stars
+export function nightSkyTexture() {
+  if (cache.has('night')) return cache.get('night');
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, '#060818'); grad.addColorStop(0.6, '#141a3c'); grad.addColorStop(1, '#2a2350');
+  g.fillStyle = grad; g.fillRect(0, 0, 512, 512);
+  const r = rng(77);
+  for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(255,255,255,${0.3 + r() * 0.7})`; const s = r() < 0.1 ? 2 : 1; g.fillRect(r() * 512, r() * 400, s, s); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('night', t);
+  return t;
+}

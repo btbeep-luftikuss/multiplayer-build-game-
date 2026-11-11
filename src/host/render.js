@@ -106,6 +106,8 @@ export class Renderer {
     if (matId === 'glass') Object.assign(opts, { transparent: true, opacity: 0.72 });
     if (matId === 'ice') Object.assign(opts, { transparent: true, opacity: 0.88 });
     if (matId === 'goo') Object.assign(opts, { emissive: new THREE.Color('#2a8a10'), emissiveIntensity: 0.35 });
+    if (matId === 'glow') Object.assign(opts, { emissive: new THREE.Color('#6dff2e'), emissiveIntensity: 0.75 });
+    if (matId === 'meteor') Object.assign(opts, { emissive: new THREE.Color('#ff5a00'), emissiveIntensity: 1.1 });
     const mat = new THREE.MeshToonMaterial(opts);
     this.mats.set(key, mat);
     return mat;
@@ -122,7 +124,7 @@ export class Renderer {
     } else if (s.look === 'log') {
       geo = new THREE.CylinderGeometry(s.parts[0].r, s.parts[0].r, DEPTH * 0.92, 24);
       geo.rotateX(Math.PI / 2);
-    } else if (s.look === 'ball') {
+    } else if (s.look === 'ball' || s.look === 'meteor') {
       geo = new THREE.SphereGeometry(s.parts[0].r, 24, 16);
     } else if (s.look === 'balloon') {
       geo = new THREE.SphereGeometry(s.parts[0].r, 24, 16);
@@ -150,6 +152,7 @@ export class Renderer {
     const sky = new THREE.CanvasTexture(c);
     sky.colorSpace = THREE.SRGBColorSpace;
     this.scene.background = sky;
+    this.daySky = sky;
 
     const back = new THREE.Group();
     const flat = (color, opts = {}) => new THREE.MeshBasicMaterial({ color, ...opts });
@@ -236,6 +239,7 @@ export class Renderer {
     meadow.rotation.x = -Math.PI / 2;
     meadow.position.set(0, -0.05, -36);
     back.add(meadow);
+    this.meadow = meadow;
 
     // clouds
     this.clouds = [];
@@ -290,7 +294,8 @@ export class Renderer {
   }
 
   buildLights() {
-    this.scene.add(new THREE.HemisphereLight('#e4f4ff', '#ffe0b5', 1.25));
+    this.hemi = new THREE.HemisphereLight('#e4f4ff', '#ffe0b5', 1.25);
+    this.scene.add(this.hemi);
     const sun = this.sunLight = new THREE.DirectionalLight('#fff3df', 2.1);
     sun.position.set(-12, 30, 22);
     sun.target.position.set(0, 6, 0);
@@ -308,14 +313,54 @@ export class Renderer {
     if (this.world) { this.scene.remove(this.world); this.world.traverse((o) => o.geometry && !o.userData.shared && o.geometry.dispose()); }
     const w = this.world = new THREE.Group();
     const gh = sim.layout.groundHalf;
-    // ground: a grassy slab with a dirt front
-    const ground = new THREE.Mesh(new THREE.BoxGeometry(gh * 2, 3, 9), [
-      this.toon('#9a6942'), this.toon('#9a6942'), this.toon('#ffffff', { map: TX.grassTexture() }), this.toon('#9a6942'),
-      this.toon('#ffffff', { map: TX.dirtTexture() }), this.toon('#9a6942'),
-    ]);
-    ground.position.set(0, -1.5, -1.5);
-    ground.receiveShadow = true;
-    w.add(ground);
+    // ground: a grassy slab with a dirt front (snowy on the ice; in two halves either side of a chasm)
+    const grassTop = sim.mods.ice ? this.toon('#eef8ff') : this.toon('#ffffff', { map: TX.grassTexture() });
+    const groundMats = [this.toon('#9a6942'), this.toon('#9a6942'), grassTop, this.toon('#9a6942'), this.toon('#ffffff', { map: TX.dirtTexture() }), this.toon('#9a6942')];
+    const g2 = sim.mods.bridge ? sim.split / 2 : 0;
+    for (const [x0, x1] of g2 ? [[-gh, -g2], [g2, gh]] : [[-gh, gh]]) {
+      const ground = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 3, 9), groundMats);
+      ground.position.set((x0 + x1) / 2, -1.5, -1.5);
+      ground.receiveShadow = true;
+      w.add(ground);
+    }
+    if (g2) {
+      // the chasm: dark all the way down
+      const pit = new THREE.Mesh(new THREE.BoxGeometry(g2 * 2, 30, 9), new THREE.MeshBasicMaterial({ color: '#120d18' }));
+      pit.position.set(0, -15 - 0.02, -1.6);
+      w.add(pit);
+      // and what counts: a golden column over the gap
+      const hgt = sim.finishY - sim.padTop + 1.5;
+      const col = new THREE.Mesh(new THREE.PlaneGeometry(g2 * 2, hgt), new THREE.MeshBasicMaterial({ color: '#ffd23d', transparent: true, opacity: 0.18, depthWrite: false }));
+      col.position.set(0, sim.padTop + hgt / 2, -1.3);
+      w.add(col);
+      for (const sx of [-1, 1]) {
+        const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.06, hgt), new THREE.MeshBasicMaterial({ color: '#ffb000', transparent: true, opacity: 0.7 }));
+        edge.position.set(sx * g2, sim.padTop + hgt / 2, -1.25);
+        w.add(edge);
+      }
+    }
+    // Lights Out: night falls, and every claw carries a lamp
+    this.setNight(!!sim.mods.dark);
+    this.lamps = [];
+    if (sim.mods.dark) {
+      for (let i = 0; i < 8; i++) {
+        const lamp = new THREE.PointLight('#ffe9b8', 0, 11, 1.2);
+        w.add(lamp);
+        this.lamps.push(lamp);
+      }
+      this.towerLamp = new THREE.PointLight('#b6ff8a', 0, 9, 1.2);
+      w.add(this.towerLamp);
+    }
+    this.flash = 0;
+    // Meteor Shower: a target where the next one will land, and a beam above it
+    this.meteorMark = null;
+    if (sim.mods.meteors) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.62, 32), new THREE.MeshBasicMaterial({ color: '#ff2a2a', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2;
+      const beam = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1), new THREE.MeshBasicMaterial({ color: '#ff3b2a', transparent: true, opacity: 0.18, depthWrite: false }));
+      w.add(ring, beam);
+      this.meteorMark = { ring, beam };
+    }
     // the build pad (and what it stands on), which may move: synced from the physics every frame
     this.buildPad(sim, w);
     // the lava (Levels): a glowing pool that rises up the sides
@@ -398,7 +443,33 @@ export class Renderer {
     this.topMarker = new THREE.Mesh(new THREE.PlaneGeometry(7, 0.06), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 }));
     this.topMarker.position.set(0, sim.padTop, -1.02);
     w.add(this.topMarker);
+    this.topMarker2 = null;
+    if (sim.mods.twin) {
+      this.topMarker2 = this.topMarker.clone();
+      this.topMarker2.material = this.topMarker.material.clone();
+      w.add(this.topMarker2);
+    }
     this.scene.add(w);
+  }
+
+  // night (Lights Out): a starry sky, dim moonlight and a dark veil over the scenery
+  setNight(on) {
+    if (on && !this.night) {
+      const veil = new THREE.Mesh(new THREE.PlaneGeometry(2400, 1200), new THREE.MeshBasicMaterial({ color: '#0b0f26', transparent: true, opacity: 0.8, depthWrite: false }));
+      veil.position.set(0, 0, -45);
+      const moon = new THREE.Mesh(new THREE.CircleGeometry(5, 40), new THREE.MeshBasicMaterial({ color: '#f4f1d0' }));
+      moon.position.set(-60, 55, -44);
+      this.night = new THREE.Group();
+      this.night.add(veil, moon);
+      this.scene.add(this.night);
+    }
+    if (this.night) this.night.visible = on;
+    this.isNight = on;
+    this.scene.background = on ? TX.nightSkyTexture() : this.daySky;
+    this.meadow.material.color.set(on ? '#1f3b2c' : '#7fd06b');
+    this.hemi.intensity = on ? 0.16 : 1.25;
+    this.sunLight.intensity = on ? 0.35 : 2.1;
+    this.sunLight.color.set(on ? '#9fb4ff' : '#fff3df');
   }
 
   buildPad(sim, w) {
@@ -408,9 +479,47 @@ export class Renderer {
     const concrete = this.toon('#ffffff', { map: TX.concreteTexture() });
     const rock = this.toon('#ffffff', { map: TX.materialTexture('stone', '#a39486') });
     const jelly = new THREE.MeshToonMaterial({ color: '#ff8fc8', gradientMap: this.ramp, transparent: true, opacity: 0.88, emissive: new THREE.Color('#ff4fa0'), emissiveIntensity: 0.15 });
+    this.beltMat = null;
     for (const pb of sim.padBodies) {
       let mesh;
-      if (pb.kind === 'soft') {
+      if (pb.kind === 'hill') {
+        // the slope (the body's own polygon), rock in front, grass on top
+        const k = pb.slope, half = sim.layout.padHalf, top = sim.padTop;
+        const geo = extrude([[-half, 0], [half, 0], [half, top + k * half], [-half, top - k * half]], 0.08, 2.2);
+        mesh = new THREE.Mesh(geo, [rock, this.toon('#79c25a')]);
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(half * 2, 0.3), signMat());
+        sign.position.set(0, top - 0.25, 1.11);
+        sign.rotation.z = Math.atan(k);
+        sign.scale.x = Math.hypot(1, k);
+        mesh.add(sign);
+      } else if (pb.kind === 'belt') {
+        // a conveyor: a belt with chevrons running along the top, rollers in front
+        const map = TX.beltTexture().clone();
+        map.needsUpdate = true;
+        map.repeat.set(pb.hw * 2, 1);
+        this.beltMat = new THREE.MeshToonMaterial({ color: '#ffffff', map, gradientMap: this.ramp });
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [stripes, stripes, this.beltMat, this.toon('#4a4a58'), this.toon('#5b5b6e'), this.toon('#4a4a58')]);
+        for (let x = -pb.hw + 0.5; x <= pb.hw - 0.4; x += 1.2) {
+          const roller = new THREE.Mesh(new THREE.CylinderGeometry(Math.min(0.13, pb.hh * 0.6), Math.min(0.13, pb.hh * 0.6), 0.1, 14), this.toon('#c9ccd6'));
+          roller.rotation.x = Math.PI / 2;
+          roller.position.set(x, 0, 1.12);
+          mesh.add(roller);
+        }
+      } else if (pb.kind === 'roof') {
+        // Twin Towers: the tops of two buildings
+        const walls = this.toon('#ffffff', { map: TX.windowsTexture(pb.body.getPosition().x < 0 ? '#f7c6c7' : '#c6dcf7') });
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [walls, walls, concrete, walls, walls, walls]);
+        const rim = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2 + 0.1, 0.12, 2.3), this.toon('#5b5b6e'));
+        rim.position.y = pb.hh - 0.06;
+        mesh.add(rim);
+      } else if (pb.kind === 'cliff') {
+        // Bridge the Gap: rocky cliffs with grass on top
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [rock, rock, this.toon('#ffffff', { map: TX.grassTexture() }), rock, rock, rock]);
+      } else if (sim.mods.ice) {
+        // the frozen lake: a slab of ice with snow on its edges
+        const ice = this.toon('#ffffff', { map: TX.materialTexture('ice', '#cdf3ff') });
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [this.toon('#eef8ff'), this.toon('#eef8ff'), ice, this.toon('#bfe9fa'), ice, this.toon('#bfe9fa')]);
+      } else if (pb.kind === 'soft') {
         mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), jelly);
       } else if (pb.kind === 'tilt') {
         mesh = new THREE.Mesh(new THREE.BoxGeometry(pb.hw * 2, pb.hh * 2, 2.2), [stripes, stripes, concrete, this.toon('#bdb6aa'), signMat(), this.toon('#bdb6aa')]);
@@ -425,7 +534,7 @@ export class Renderer {
       }
       mesh.receiveShadow = mesh.castShadow = true;
       w.add(mesh);
-      this.padViews.push({ mesh, body: pb.body });
+      this.padViews.push({ mesh, body: pb.body, cx: pb.kind === 'hill' ? 0 : pb.cx || 0, cy: pb.kind === 'hill' ? 0 : pb.cy || 0 });
     }
     if (sim.tub) {
       const tub = new THREE.Mesh(new THREE.BoxGeometry(sim.tub.hw * 2 + 0.3, sim.tub.h, 2.3), this.toon('#8a5a36'));
@@ -455,6 +564,7 @@ export class Renderer {
     this.platformViews.clear();
     this.sim = sim;
     this.crossed = false;
+    this.parts = this.parts.filter((p) => !p.keep); // (no snow or sparks left over from another level)
     this.buildWorld(sim);
     this.cam = null;
   }
@@ -790,6 +900,13 @@ export class Renderer {
       case 'clamp': { const v = view(e.piece); if (v) { v.wobble = 1; v.flash = 1; } break; }
       case 'burn': this.puff(e.x, e.y + 0.2, { n: 18, color: '#ff8a1a', size: 0.3, speed: 3, up: 2 }); break;
       case 'shatter': this.puff(e.x, e.y, { n: 22, color: '#c8f6ff', size: 0.16, speed: 5, gravity: 9, life: 0.9 }); this.shake(0.15); break;
+      case 'meteor':
+        this.puff(e.x, e.y, { n: 26, color: '#ffb020', size: 0.22, speed: 4, life: 0.6, up: 1 });
+        this.puff(e.x, e.y, { n: 14, color: e.hit === 'claw' ? '#ffffff' : '#6b5a52', size: 0.3, speed: 1.6, life: 1.1, up: 1.2 });
+        this.shake(e.hit === 'claw' ? 0.12 : 0.25);
+        break;
+      case 'quake': this.shake(0.3); break;
+      case 'lightning': this.flash = 1; break;
       case 'glitch': { const c = this.sim.claws.get(e.slot); if (c) { const p = c.body.getPosition(); this.puff(p.x, p.y, { n: 8, color: '#ff9a9a', size: 0.15, speed: 2 }); } break; }
       case 'boost': { const c = this.sim.claws.get(e.slot); if (c) { const p = c.body.getPosition(); this.puff(p.x, p.y, { n: 24, color: '#ffd84a', size: 0.2, speed: 4 }); } break; }
       case 'anchor': this.puff(e.x, this.sim.padTop, { n: 16, color: '#d9c39a', size: 0.25, speed: 3 }); break;
@@ -889,7 +1006,7 @@ export class Renderer {
       }
       // the lamp: green when holding, white when open, grey when shut on nothing; dim if the player is away
       const away = player && !player.connected;
-      v.lampMat.color.set(away ? '#555555' : claw.boosted ? (Math.sin(this.time * 20) > 0 ? '#ffd84a' : '#ffffff') : claw.state === 'holding' ? '#3dff7a' : claw.state === 'closed' ? '#9aa0b0' : '#ffffff');
+      v.lampMat.color.set(away ? '#555555' : claw.flipUntil > sim.time ? (Math.sin(this.time * 14) > 0 ? '#c77dff' : '#ffffff') : claw.boosted ? (Math.sin(this.time * 20) > 0 ? '#ffd84a' : '#ffffff') : claw.state === 'holding' ? '#3dff7a' : claw.state === 'closed' ? '#9aa0b0' : '#ffffff');
       // rope from the trolley to the claw, sagging when slack, warmer in colour under strain
       const a = { x: tx, y: sim.topY - 0.28 };
       const b = claw.body.getWorldPoint({ x: 0, y: CLAW.ropeOnClaw });
@@ -930,13 +1047,22 @@ export class Renderer {
     this.finishSheet.material.color.set(over ? '#5dff8a' : '#ffffff');
     this.finishSheet.material.opacity = over ? 0.35 + 0.15 * Math.sin(this.time * 6) : 0.18;
     for (const f of this.finishFlags) f.rotation.y = Math.sin(this.time * 3 + f.position.x) * 0.3;
-    this.topMarker.position.set(sim.tower.x, sim.padTop + sim.tower.height, -1.02);
+    this.topMarker.position.set(sim.mods.bridge ? sim.tower.topX : sim.tower.x, sim.padTop + sim.tower.height, -1.02);
     // the level's moving parts
-    for (const v of this.padViews) { const p = v.body.getPosition(); v.mesh.position.set(p.x, p.y, 0); v.mesh.rotation.z = v.body.getAngle(); }
+    for (const v of this.padViews) { const p = v.body.getWorldPoint({ x: v.cx, y: v.cy }); v.mesh.position.set(p.x, p.y, 0); v.mesh.rotation.z = v.body.getAngle(); }
     this.finishGroup.position.y = sim.finishY - this.finishBuiltY;
     this.updateLevelEffects(dt, sim);
     this.topMarker.visible = sim.tower.height > 0.2;
     this.topMarker.material.color.set(over ? '#5dff8a' : '#ffffff');
+    if (this.topMarker2 && sim.tower.sides) {
+      // two towers: a marker on each
+      const [a, b] = sim.tower.sides;
+      for (const [m, side] of [[this.topMarker, a], [this.topMarker2, b]]) {
+        m.position.set(side.x, sim.padTop + side.h, -1.02);
+        m.visible = side.h > 0.2;
+        m.material.color.set(side.h >= sim.finishHeight ? '#5dff8a' : '#ffffff');
+      }
+    }
 
     for (const c of this.clouds) { c.position.x += dt * 0.6; if (c.position.x > 140) c.position.x = -140; }
     this.airBalloon.position.x += dt * 0.9;
@@ -967,6 +1093,57 @@ export class Renderer {
     if (sim.mods.wind && Math.abs(sim.wind) > 0.15 && Math.random() < dt * 40 * Math.abs(sim.wind) / sim.mods.wind.max) {
       const dir = Math.sign(sim.wind);
       add({ x: dir > 0 ? view.x0 : view.x1, y: rnd(sim.padTop + 0.5, sim.topY - 1), vx: dir * rnd(7, 11), vy: rnd(-0.3, 0.3), life: 3.5, size: 0.07, color: '#ffffff' });
+    }
+    // a conveyor belt: its chevrons run with the belt
+    if (this.beltMat) this.beltMat.map.offset.x -= sim.belt * dt;
+    // an earthquake: the camera shakes and dust puffs up along the pad
+    if (sim.quaking) {
+      this.shakeAmt = Math.max(this.shakeAmt, 0.18);
+      if (Math.random() < dt * 25) add({ x: rnd(-L.padHalf, L.padHalf), y: 0.05, vx: rnd(-0.6, 0.6), vy: rnd(0.4, 1.2), life: 1.2, size: rnd(0.15, 0.3), color: '#c9b49a', z: rnd(1.1, 1.5) });
+    }
+    // the ice: snow drifting down
+    if (sim.mods.ice && Math.random() < dt * 30) add({ x: rnd(view.x0, view.x1), y: sim.topY + 1, vx: rnd(-0.3, 0.3), vy: -rnd(0.8, 1.5), life: 12, size: rnd(0.05, 0.11), color: '#ffffff' });
+    // meteors: a fiery trail, and a target where the next one will land
+    for (const p of sim.pieces) {
+      if (p.special !== 'meteor' || Math.random() > dt * 60) continue;
+      const q = p.body.getPosition();
+      add({ x: q.x + rnd(-0.12, 0.12), y: q.y + 0.2, vx: 0, vy: rnd(0.5, 1.5), life: 0.45, size: rnd(0.12, 0.24), color: Math.random() < 0.5 ? '#ffd040' : '#ff5a14', z: rnd(-0.2, 0.2) });
+    }
+    if (this.meteorMark) {
+      const warn = sim.meteor?.warn;
+      const { ring, beam } = this.meteorMark;
+      ring.visible = beam.visible = !!warn;
+      if (warn) {
+        const land = this.rayDown(sim, warn.x, sim.topY - 1, null);
+        const left = Math.max(0, warn.at - sim.time);
+        const pulse = 0.5 + 0.5 * Math.sin(this.time * (8 + (2.2 - left) * 10));
+        ring.position.set(warn.x, land + 0.04, 0);
+        ring.scale.setScalar(0.8 + 0.4 * pulse);
+        const len = Math.max(0.1, sim.topY - land);
+        beam.position.set(warn.x, land + len / 2, -0.2);
+        beam.scale.set(1, len, 1);
+        beam.material.opacity = 0.1 + 0.15 * pulse;
+      }
+    }
+    // the night: lamps on the claws (and on the tower's top), lightning now and then
+    if (this.lamps && this.lamps.length) {
+      let i = 0;
+      for (const c of sim.claws.values()) {
+        if (i >= this.lamps.length) break;
+        const q = c.body.getPosition();
+        this.lamps[i].position.set(q.x, q.y - 0.6, 1.4);
+        this.lamps[i].intensity = 14;
+        i++;
+      }
+      for (; i < this.lamps.length; i++) this.lamps[i].intensity = 0;
+      this.towerLamp.intensity = sim.tower.count ? 8 : 0;
+      this.towerLamp.position.set(sim.tower.x, sim.padTop + sim.tower.height + 0.8, 1.6);
+    }
+    if (this.isNight) {
+      this.flash = Math.max(0, this.flash - dt * 2.2);
+      const f = this.flash > 0.55 || (this.flash > 0.2 && this.flash < 0.35) ? 1 : 0; // a double flicker
+      this.hemi.intensity = 0.16 + f * 1.6;
+      if (this.night) this.night.children[0].material.opacity = 0.8 - f * 0.5;
     }
     // low gravity: slow purple sparkles drifting up on the right
     if (this.zone && Math.random() < dt * 8) add({ x: rnd(0.3, L.halfW), y: rnd(0, sim.topY - 2), vx: 0, vy: rnd(0.3, 0.8), life: 2.5, size: 0.07, color: '#c9a8ff' });
@@ -1003,10 +1180,10 @@ export class Renderer {
   // the first surface straight below (x, y), ignoring the claw and what it carries
   rayDown(sim, x, y, claw) {
     let hitY = 0;
-    const held = claw.hold ? claw.hold.piece.body : null;
+    const held = claw?.hold ? claw.hold.piece.body : null;
     sim.world.rayCast({ x, y }, { x, y: -1 }, (fixture, point, normal, fraction) => {
-      const b = fixture.getBody();
-      if (b === claw.body || b === held || b.getUserData()?.kind === 'claw') return -1;
+      const b = fixture.getBody(), ud = b.getUserData();
+      if ((claw && b === claw.body) || b === held || ud?.kind === 'claw' || (ud?.kind === 'piece' && ud.piece.special === 'meteor')) return -1;
       hitY = point.y;
       return fraction;
     });

@@ -1,4 +1,4 @@
-// Levels mode: ten handcrafted challenges, then an endless remix. Each level sets its time limit, how
+// Levels mode: twenty handcrafted challenges, and an endless remix (open once Level 10 is beaten). Each level sets its time limit, how
 // high the tower must reach (for 2 players; a little higher with more), the pieces everyone gets,
 // whether power-ups appear, and the mechanics ("mods") that make it hard. Data only: the TV's physics
 // and the phones both read it.
@@ -14,7 +14,19 @@ export const MOD_INFO = {
   moveLine: { icon: '🎯', label: 'Moving finish line' },
   unstable: { icon: '⚠️', label: 'Unstable claws' },
   fragile: { icon: '💎', label: 'Fragile glass' },
+  ice: { icon: '❄️', label: 'Slippery ice' },
+  hill: { icon: '⛰️', label: 'Sloping ground' },
+  conveyor: { icon: '🏭', label: 'Conveyor belt' },
+  quake: { icon: '🫨', label: 'Earthquakes' },
+  twin: { icon: '🏙️', label: 'Two towers' },
+  meteors: { icon: '☄️', label: 'Meteor shower' },
+  bridge: { icon: '🌉', label: 'Build over the chasm' },
+  dark: { icon: '🌙', label: 'Lights out' },
+  mixup: { icon: '🔀', label: 'Mixed-up controls' },
 };
+
+// the Endless Remix opens once this level is beaten
+export const REMIX_AFTER = 10;
 
 export const LEVELS = [
   {
@@ -77,6 +89,66 @@ export const LEVELS = [
     mods: { wind: { max: 1.4 }, tilt: { amp: 4, period: 22 }, magnets: true, lava: { rise: 0.85 } },
     pool: [['magn-cube', 3], ['mags-cube', 3], ['stone-pyramid', 2], ['stone-slab', 2], ['metal-plus', 2], ['metal-cup', 2], ['stone-tall', 2], ['wood-cube', 6]],
   },
+  {
+    id: 11, name: 'Frozen Lake', icon: '❄️', time: 240, height: 9.5, powerups: true,
+    blurb: 'Everything is slippery on the ice! Pink rubber stays grippy, and cups and stairs hold what sits in them.',
+    mods: { ice: { grip: 0.3 } },
+    pool: [['ice-cube', 5], ['ice-post', 2], ['rubber-mat', 3], ['rubber-cube', 4], ['wood-cup', 3], ['metal-cup', 2], ['clay-stairs', 2], ['crate', 2]],
+  },
+  {
+    id: 12, name: 'Hillside', icon: '⛰️', time: 240, height: 10, powerups: true,
+    blurb: 'The ground slopes uphill to the right. Levellers (their bottoms are sloped to match) give the tower a flat start.',
+    mods: { hill: { slope: 0.18 } },
+    pool: [['wood-shim', 3], ['stone-shim', 2], ['stone-big', 2], ['stone-cube', 5], ['wood-short', 3], ['clay-brick', 5], ['metal-l', 2], ['wood-stairs', 2]],
+  },
+  {
+    id: 13, name: 'Conveyor Belt', icon: '🏭', time: 240, height: 10, powerups: true,
+    blurb: 'The build pad is a conveyor belt that runs one way, slows, and runs back. Chase the tower, and keep it off the ends!',
+    mods: { conveyor: { speed: 0.8, period: 18 } },
+    pool: [['crate', 3], ['metal-crate', 2], ['wood-barrel', 4], ['wood-pallet', 3], ['metal-girder', 2], ['metal-l', 2], ['wood-cube', 5]],
+  },
+  {
+    id: 14, name: 'Earthquake', icon: '🫨', time: 240, height: 10.5, powerups: true,
+    blurb: 'Every so often the ground shakes (you\'ll get a warning). Wide, heavy, well-stacked towers ride it out.',
+    mods: { quake: { every: 22, len: 4, amp: 0.12, hz: 1.6, ay: 0.02 } },
+    pool: [['stone-big', 3], ['clay-big', 3], ['stone-pyramid', 2], ['clay-brick', 6], ['clay-arch', 2], ['wood-raft', 2], ['stone-cube', 4]],
+  },
+  {
+    id: 15, name: 'Twin Towers', icon: '🏙️', time: 270, height: 8, powerups: true,
+    blurb: 'Two rooftops, two towers: BOTH have to reach the line. Split the team, and don\'t let one side fall behind.',
+    mods: { twin: { gap: 3 } },
+    pool: [['wood-tall', 2], ['stone-tall', 2], ['glass-cube', 4], ['metal-beam', 3], ['clay-brick', 6], ['crate', 2], ['metal-t', 2], ['wood-cube', 5]],
+  },
+  {
+    id: 16, name: 'Meteor Shower', icon: '☄️', time: 210, height: 11, powerups: true,
+    blurb: 'Fireballs fall where the red target shows: they burn wood and knock things. Hold your claw over the target to block one!',
+    mods: { meteors: { min: 8, max: 12 } },
+    pool: [['metal-roof', 3], ['stone-cube', 6], ['stone-hex', 3], ['metal-cup', 2], ['wood-cube', 6], ['wood-short', 4], ['crate', 2], ['stone-slab', 2]],
+  },
+  {
+    id: 17, name: 'Bridge the Gap', icon: '🌉', time: 240, height: 8.5, powerups: true,
+    blurb: 'Two cliffs and a bottomless chasm. Only what\'s built OVER the gap counts: bridge it, then build up from the middle.',
+    mods: { bridge: { gap: 3 } },
+    pool: [['metal-bridge', 2], ['wood-bridge', 2], ['metal-girder', 2], ['stone-arch', 2], ['wood-cube', 6], ['stone-cube', 4], ['wood-post', 3], ['wood-plank', 3]],
+  },
+  {
+    id: 18, name: 'Lights Out', icon: '🌙', time: 210, height: 11, powerups: true,
+    blurb: 'Night falls: your claw carries a lamp, glow blocks light up the tower, and lightning flashes now and then. Shout what you can see!',
+    mods: { dark: true },
+    pool: [['glow-cube', 4], ['glow-bar', 3], ['glow-hex', 3], ['wood-cube', 5], ['stone-cube', 4], ['stone-slab', 2], ['candy-post', 3], ['crate', 2]],
+  },
+  {
+    id: 19, name: 'Mixed-Up Claws', icon: '🔀', time: 200, height: 11.5, powerups: true,
+    blurb: 'Every few seconds someone\'s controls flip (left is right, and sometimes up is down) for a while. Your phone tells you when!',
+    mods: { mixup: { min: 9, max: 15, len: 9 } },
+    pool: [['candy-cube', 5], ['candy-beam', 3], ['candy-post', 3], ['candy-roof', 2], ['rubber-cube', 3], ['wood-hex', 3], ['wood-cup', 2], ['foam-star', 2]],
+  },
+  {
+    id: 20, name: 'Grand Finale', icon: '👑', time: 210, height: 12, powerups: true,
+    blurb: 'Night, earthquakes, a meteor shower and mixed-up controls, all at once. The ultimate test of teamwork!',
+    mods: { dark: true, quake: { every: 26, len: 3.5, amp: 0.1, hz: 1.6, ay: 0.02 }, meteors: { min: 10, max: 15 }, mixup: { min: 14, max: 22, len: 8 } },
+    pool: [['stone-big', 3], ['metal-roof', 2], ['glow-cube', 3], ['glow-bar', 2], ['stone-cube', 5], ['clay-brick', 5], ['metal-crate', 2], ['stone-tall', 2]],
+  },
 ];
 
 export const REMIX = {
@@ -94,23 +166,35 @@ export function levelHeight(def, players) {
   return Math.round((def.height + 0.6 * (Math.max(2, players) - 2)) * 2) / 2;
 }
 
-// one remix round: two or three mechanics from the levels, a pool of everything
+// one remix round: two or three mechanics from the levels, a pool of everything. Some mechanics change
+// the build pad itself (`pad`), so a mix has at most one of those.
 const REMIX_MODS = [
-  () => ({ wind: { max: 1.6 } }),
-  () => ({ soft: true }),
-  () => ({ tilt: { amp: 5, period: 20 } }),
-  () => ({ magnets: true }),
-  () => ({ lava: { rise: 0.85 } }),
-  () => ({ gravity: { right: 0.35 } }),
-  () => ({ moveLine: { amp: 1, period: 22 } }),
-  () => ({ unstable: { min: 7, max: 14, drop: 0.1 }, fragile: true }),
+  { make: () => ({ wind: { max: 1.6 } }) },
+  { pad: true, make: () => ({ soft: true }) },
+  { pad: true, make: () => ({ tilt: { amp: 5, period: 20 } }) },
+  { make: () => ({ magnets: true }) },
+  { make: () => ({ lava: { rise: 0.85 } }) },
+  { make: () => ({ gravity: { right: 0.35 } }) },
+  { make: () => ({ moveLine: { amp: 1, period: 22 } }) },
+  { make: () => ({ unstable: { min: 7, max: 14, drop: 0.1 }, fragile: true }) },
+  { make: () => ({ ice: { grip: 0.4 } }) },
+  { make: () => ({ conveyor: { speed: 0.6, period: 18 } }) },
+  { pad: true, make: () => ({ quake: { every: 24, len: 3.5, amp: 0.1, hz: 1.6, ay: 0.02 } }) },
+  { make: () => ({ meteors: { min: 10, max: 15 } }) },
+  { make: () => ({ dark: true }) },
+  { make: () => ({ mixup: { min: 12, max: 20, len: 8 } }) },
 ];
 export function remixLevel(wins, random = Math.random) {
   const picks = new Set();
   const n = 2 + (random() < 0.4 ? 1 : 0);
-  while (picks.size < n) picks.add(Math.floor(random() * REMIX_MODS.length));
+  let guard = 0;
+  while (picks.size < n && guard++ < 200) {
+    const i = Math.floor(random() * REMIX_MODS.length);
+    if (REMIX_MODS[i].pad && [...picks].some((j) => REMIX_MODS[j].pad)) continue;
+    picks.add(i);
+  }
   const mods = {};
-  for (const i of picks) Object.assign(mods, REMIX_MODS[i]());
+  for (const i of picks) Object.assign(mods, REMIX_MODS[i].make());
   return {
     ...REMIX, mods,
     height: Math.min(14, REMIX.height + wins * 0.5),
@@ -124,6 +208,9 @@ export function remixLevel(wins, random = Math.random) {
       const pool = pick.map((id, i) => [id, i < 2 ? 6 : 3]);
       if (mods.magnets) pool.push(['magn-cube', 3], ['mags-cube', 3]);
       if (mods.lava) pool.unshift(['stone-cube', 6], ['stone-post', 3]);
+      if (mods.ice) pool.push(['rubber-cube', 3], ['wood-cup', 2]);
+      if (mods.meteors) pool.push(['metal-roof', 2]);
+      if (mods.dark) pool.push(['glow-cube', 3]);
       const merged = new Map();
       for (const [id, n] of pool) merged.set(id, (merged.get(id) || 0) + n);
       return [...merged];

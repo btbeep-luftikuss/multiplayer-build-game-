@@ -12,7 +12,7 @@ const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 const problems = new Set();
 const allDone = Object.fromEntries(LEVELS.map((l) => [l.id, { done: true, best: 99 }]));
 for (const id of [...LEVELS.map((l) => l.id), 'remix']) {
-  const g = new Game({ random: rnd, progress: { unlocked: 10, levels: allDone } });
+  const g = new Game({ random: rnd, progress: { unlocked: LEVELS.length, levels: allDone } });
   const ids = [];
   for (let i = 0; i < 4; i++) { ids.push('p' + i); g.addPlayer('p' + i, 'P' + i); }
   g.setLevel(id);
@@ -46,7 +46,7 @@ for (const id of [...LEVELS.map((l) => l.id), 'remix']) {
         const pos = p.body.getPosition();
         if (!Number.isFinite(pos.x + pos.y + p.body.getAngle())) problems.add(`${where}: a piece has a bad position`);
         // nothing should end up inside the pad or the mesa under it
-        if (Math.abs(pos.x) < s.layout.padHalf - 0.6 && pos.y < s.padTop - 1.2 && pos.y > -0.5 && !s.mods.soft && !s.mods.tilt) problems.add(`${where}: a ${p.type} fell into the pad (y ${pos.y.toFixed(2)})`);
+        if (Math.abs(pos.x) < s.layout.padHalf - 0.6 && Math.abs(pos.x) > s.split / 2 + 0.6 && pos.y < s.padTop - 1.2 - (s.mods.hill ? s.mods.hill.slope * s.layout.padHalf : 0) && pos.y > -0.5 && !s.mods.soft && !s.mods.tilt) problems.add(`${where}: a ${p.type} fell into the pad (y ${pos.y.toFixed(2)})`);
         if (p.parked && !s.platforms.has(p.owner)) problems.add(`${where}: a waiting piece floats where a shelf was`);
         if (p.parked && p.heldBy.size) problems.add(`${where}: a held piece is still parked`);
       }

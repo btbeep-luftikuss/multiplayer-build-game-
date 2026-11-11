@@ -21,6 +21,10 @@ export const MATERIALS = {
   magnet:   { density: 2.6,  friction: 0.7,  restitution: 0.0,  color: '#ff4b4b', dark: '#c22424', sound: 'metal' },
   balloon:  { density: 0.05, friction: 0.4,  restitution: 0.3,  color: '#ff6fb5', dark: '#d84a90', burns: true, sound: 'soft' },
   scaffold: { density: 1.4,  friction: 0.9,  restitution: 0.0,  color: '#ffcf2e', dark: '#333333', sound: 'metal' },
+  // glows in the dark (Lights Out)
+  glow:     { density: 1.2,  friction: 0.8,  restitution: 0.02, color: '#a6ff5c', dark: '#5fcf2a', sound: 'soft', glow: true },
+  // a falling meteor (Meteor Shower): not a building piece
+  meteor:   { density: 1.0,  friction: 0.5,  restitution: 0.0,  color: '#ff7a2a', dark: '#b8400a', sound: 'stone' },
 };
 
 const rect = (w, h, cx = 0, cy = 0) => [[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2]];
@@ -107,6 +111,13 @@ export const SHAPES = {
   },
   tall:     { parts: [poly(rect(0.8, 3))] },
   raft:     { parts: [poly(rect(3.6, 0.4))] },
+  // a leveller: its underside slopes up to the right by 0.18 (the Hillside's slope), its top is flat
+  shim:     { parts: [poly(centred([[-1.2, 0], [1.2, 0.432], [1.2, 0.72], [-1.2, 0.72]]))] },
+  barrel:   { parts: [poly(rect(0.9, 1.2))], look: 'column' },
+  pallet:   { parts: [poly(rect(2.4, 0.3))] },
+  big:      { parts: [poly(rect(2, 1))] },
+  longbeam: { parts: [poly(rect(5, 0.4))], look: 'girder' },
+  rock:     { parts: [circle(0.3)], look: 'meteor' },
   // only ever an icon (the Super Claw power-up isn't a piece)
   bolt: {
     parts: [poly(rect(0.8, 1.6))],
@@ -194,6 +205,22 @@ export const PIECES = {
   'wood-raft':    { shape: 'raft', mat: 'wood', name: 'Wide Board' },
   'foam-raft':    { shape: 'raft', mat: 'foam', name: 'Foam Board' },
   // magnetic blocks (Levels mode): opposite poles pull together, the same push apart
+  // levels 11-20
+  'rubber-mat':   { shape: 'plank', mat: 'rubber', name: 'Grip Mat' },
+  'wood-shim':    { shape: 'shim', mat: 'wood', name: 'Leveller' },
+  'stone-shim':   { shape: 'shim', mat: 'stone', name: 'Stone Leveller' },
+  'metal-crate':  { shape: 'crate', mat: 'metal', name: 'Steel Crate' },
+  'wood-barrel':  { shape: 'barrel', mat: 'wood', name: 'Barrel' },
+  'wood-pallet':  { shape: 'pallet', mat: 'wood', name: 'Pallet' },
+  'stone-big':    { shape: 'big', mat: 'stone', name: 'Big Block' },
+  'clay-big':     { shape: 'big', mat: 'clay', name: 'Big Brick' },
+  'metal-roof':   { shape: 'roof', mat: 'metal', name: 'Steel Roof' },
+  'metal-bridge': { shape: 'longbeam', mat: 'metal', name: 'Bridge Beam' },
+  'wood-bridge':  { shape: 'longbeam', mat: 'wood', name: 'Long Plank' },
+  'glow-cube':    { shape: 'cube', mat: 'glow', name: 'Glow Cube' },
+  'glow-bar':     { shape: 'shortbeam', mat: 'glow', name: 'Glow Bar' },
+  'glow-hex':     { shape: 'hex', mat: 'glow', name: 'Glow Hex' },
+  'meteor':       { shape: 'rock', mat: 'meteor', name: 'Meteor', special: 'meteor' },
   'magn-cube':    { shape: 'cube', mat: 'magN', name: 'North Cube', pole: 1 },
   'mags-cube':    { shape: 'cube', mat: 'magS', name: 'South Cube', pole: -1 },
   'magn-bar':     { shape: 'shortbeam', mat: 'magN', name: 'North Bar', pole: 1 },

@@ -54,6 +54,7 @@ export class Hud {
         <div id="level-chip"><b class="name"></b><span class="mods"></span></div>
         <div id="level-intro"></div>
         <div id="zone-label">🪐 LOW GRAVITY</div>
+        <div id="gap-label">🌉 ONLY WHAT'S OVER THE GAP COUNTS</div>
         <div id="smash-bar"></div>
         <div id="tags"></div>
         <div id="pops"></div>
@@ -203,7 +204,9 @@ export class Hud {
     fl.classList.toggle('over', h >= sim.finishHeight);
     const hl = $('#height-label', this.root);
     if (h > 0.2) {
-      const hp = r.project(sim.tower.x + 3.6, sim.padTop + h, -1);
+      // (two towers: next to the lower one; over a chasm: next to the top piece)
+      const lowSide = sim.tower.sides ? (sim.tower.sides[0].h <= sim.tower.sides[1].h ? sim.tower.sides[0] : sim.tower.sides[1]) : null;
+      const hp = r.project((lowSide ? lowSide.x : sim.mods.bridge ? sim.tower.topX : sim.tower.x) + 3.6, sim.padTop + h, -1);
       hl.style.display = '';
       hl.style.transform = `translate(${hp.x}px, ${hp.y}px) translate(0, -50%)`;
       hl.textContent = `${h.toFixed(1)} m`;
@@ -241,6 +244,15 @@ export class Hud {
         if (k === 'wind') {
           const w = sim.wind, n = Math.min(3, Math.round(Math.abs(w) / sim.mods.wind.max * 3));
           bits.push(`🌬️ ${w < -0.05 ? '◀'.repeat(Math.max(1, n)) : w > 0.05 ? '▶'.repeat(Math.max(1, n)) : '·'}`);
+        } else if (k === 'conveyor') {
+          const b = sim.belt, n = Math.min(3, Math.round(Math.abs(b) / sim.mods.conveyor.speed * 3));
+          bits.push(`🏭 Belt ${b < -0.05 ? '◀'.repeat(Math.max(1, n)) : b > 0.05 ? '▶'.repeat(Math.max(1, n)) : '·'}`);
+        } else if (k === 'quake') {
+          bits.push(sim.quaking ? '🫨 QUAKE!' : sim.quake.warned ? '⚠️ Quake coming!' : '🫨 Earthquakes');
+        } else if (k === 'twin' && sim.tower.sides) {
+          bits.push(`🏙️ Left ${sim.tower.sides[0].h.toFixed(1)} m · Right ${sim.tower.sides[1].h.toFixed(1)} m`);
+        } else if (k === 'fragile' && lv.mods.unstable) {
+          continue;
         } else bits.push(`${MOD_INFO[k].icon} ${MOD_INFO[k].label}`);
       }
       const modsHtml = bits.map((b) => `<span>${esc(b)}</span>`).join('');
@@ -252,6 +264,12 @@ export class Hud {
     if (showIntro && intro._lv !== lv) {
       intro._lv = lv;
       intro.innerHTML = `<div class="t">${lv.icon} ${game.levelId === 'remix' ? 'Endless Remix' : 'Level ' + game.levelId}: ${esc(lv.name)}</div><div>${esc(lv.blurb)}</div><div class="goal">Reach <b>${sim.finishHeight.toFixed(1)} m</b> in <b>${fmtTime(lv.time)}</b>${Object.keys(lv.mods).length ? ' · ' + Object.keys(lv.mods).map((k) => MOD_INFO[k].icon + ' ' + MOD_INFO[k].label).join(' · ') : ''}</div>`;
+    }
+    const gl = $('#gap-label', this.root);
+    gl.classList.toggle('show', !!sim.mods.bridge && phase !== 'result');
+    if (sim.mods.bridge) {
+      const gp = r.project(0, sim.padTop + 0.35, -1.3);
+      gl.style.transform = `translate(${gp.x}px, ${gp.y}px) translate(-50%, 0)`;
     }
     const zl = $('#zone-label', this.root);
     zl.classList.toggle('show', !!sim.mods.gravity);
@@ -352,7 +370,8 @@ export class Hud {
     $('.verdict', R).innerHTML = lvl ? (res.success ? 'LEVEL COMPLETE!' : 'LEVEL FAILED') : res.success ? 'THE TOWER STANDS!' : res.height < 0.5 ? 'NO TOWER…' : 'NOT TALL ENOUGH';
     $('.level-line', R).innerHTML = !lvl ? '' : `${lvl.icon} ${lvl.id === 'remix' ? 'Endless Remix' : 'Level ' + lvl.id}: ${esc(lvl.name)}` +
       (res.success ? ` · in <b>${fmtTime(lvl.time)}</b>${res.newBest ? ' <span class="best">New best!</span>' : ''}` : '') +
-      (res.unlocked ? `<div class="unlock">🔓 ${res.unlocked === 'remix' ? 'Endless Remix' : 'Level ' + res.unlocked} unlocked!</div>` : '');
+      (res.unlocked ? `<div class="unlock">🔓 ${res.unlocked === 'remix' ? 'Endless Remix' : 'Level ' + res.unlocked}${res.remixOpen ? ' and the Endless Remix' : ''} unlocked!</div>` : '') +
+      (res.allDone ? '<div class="unlock">🏆 Every level beaten! Try the Endless Remix next</div>' : '');
     const btns = $('.buttons', R);
     btns.innerHTML = '';
     const button = (text, cls, fn) => { const b = el('button', cls, text); b.onclick = fn; btns.appendChild(b); };
@@ -435,6 +454,17 @@ export class Hud {
       case 'glitch': { const c = game.sim.claws.get(e.slot); if (c) { const p = c.body.getPosition(); this.pop(r, p.x, p.y + 1, { slip: 'slip!', stretch: 'stretch!', drop: 'oops, dropped!' }[e.kind], '#ffb0b0'); } break; }
       case 'boost': this.feed(`⚡ ${who(e.slot)} has a <b>Super Claw</b>!`); break;
       case 'shatter': this.pop(r, e.x, e.y + 0.5, 'smash!', '#bff6ff'); break;
+      case 'quakewarn': this.banner('⚠️ EARTHQUAKE!<div class="small">Hold on to something…</div>', 'bad', 2); break;
+      case 'meteor':
+        if (e.hit === 'claw') { this.pop(r, e.x, e.y + 0.8, 'blocked!', '#9effc0'); this.feed(`🛡️ ${who(e.slot)} blocked a meteor!`); }
+        else if (e.hit === 'burn') this.pop(r, e.x, e.y + 0.6, 'burnt!', '#ffb36b');
+        break;
+      case 'flip': {
+        const c = game.sim.claws.get(e.slot);
+        if (c) { const p = c.body.getPosition(); this.pop(r, p.x, p.y + 1, e.both ? '🔀 all mixed up!' : '🔀 flipped!', '#e2b6ff'); }
+        this.feed(`🔀 ${who(e.slot)}'s controls are flipped${e.both ? ' (both ways)' : ''}!`);
+        break;
+      }
       default: break;
     }
   }

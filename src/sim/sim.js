@@ -129,12 +129,15 @@ export class Piece {
     const m = MATERIALS[def.mat];
     this.body = sim.world.createBody({
       type: 'dynamic', position: Vec2(x, y), angle,
-      linearDamping: def.special === 'balloon' ? 1.6 : 0.02,
+      linearDamping: def.special === 'balloon' ? 1.6 : def.special === 'meteor' ? 0.9 : 0.02,
       angularDamping: def.special === 'balloon' ? 2 : 0.08,
+      bullet: def.special === 'meteor',
     });
+    // on the ice (Frozen Lake) everything is slippery, except grippy rubber and goo
+    const grip = sim.mods.ice && def.mat !== 'rubber' && def.mat !== 'goo' ? sim.mods.ice.grip : 1;
     for (const shape of makeShapes(def.shape)) {
       this.body.createFixture({
-        shape, density: m.density, friction: m.friction, restitution: m.restitution,
+        shape, density: m.density, friction: m.friction * grip, restitution: m.restitution,
         filterCategoryBits: CAT.PIECE, filterMaskBits: SOLID,
       });
     }
@@ -178,6 +181,8 @@ export class Claw {
     this.reeling = 0;        // how fast the rope is moving (for sound)
     this.boostUntil = -1;    // the Super Claw power-up
     this.slipUntil = -1;     // Unstable claws: the grip is weak for a moment
+    this.flipUntil = -Infinity; // Mixed-up claws: left and right (and maybe up and down) swapped until then
+    this.flipBoth = false;
     this.nextGlitch = sim.time + 4 + Math.random() * 6;
   }
 
@@ -208,7 +213,8 @@ export class Claw {
     const sim = this.sim;
     const body = this.body;
     const load = this.loadMass();
-    const inp = this.enabled ? this.input : { mx: 0, ry: 0 };
+    let inp = this.enabled ? this.input : { mx: 0, ry: 0 };
+    if (sim.time < this.flipUntil) inp = { mx: -inp.mx, ry: this.flipBoth ? -inp.ry : inp.ry };
     const boost = this.boosted ? 1.5 : 1;
     // trolley along the bar
     const vmax = CLAW.vMax * boost / (1 + load / 12);
@@ -347,7 +353,7 @@ export class Claw {
         const p = this.body.getWorldPoint(Vec2(J.cx + (i / 4 * 2 - 1) * J.hw * 0.9, J.cy + (j / 3 * 2 - 1) * J.hh * 0.95));
         this.sim.world.queryAABB(new AABB(Vec2(p.x - 0.01, p.y - 0.01), Vec2(p.x + 0.01, p.y + 0.01)), (fx) => {
           const ud = fx.getBody().getUserData();
-          if (ud?.kind === 'piece' && !ud.piece.dead && !fx.getBody().isStatic() && fx.testPoint(p)) {
+          if (ud?.kind === 'piece' && !ud.piece.dead && ud.piece.special !== 'meteor' && !fx.getBody().isStatic() && fx.testPoint(p)) {
             hits.set(ud.piece, (hits.get(ud.piece) || 0) + 1);
           }
           return true;
@@ -477,7 +483,12 @@ export class Sim {
     // lava that rises part way up the tower (`upTo`, a share of the finish height) leaves the pad on the
     // ground and floats the shelves as rafts; lava that stays low raises the pad onto a mesa above it
     this.rafts = !!(mods.lava && mods.lava.upTo);
-    const lift = (mods.soft ? 0.8 : 0) + (mods.tilt ? 1.0 : 0) + (mods.lava && !this.rafts ? 1.4 : 0);
+    // two pads with a gap between: two rooftops (Twin Towers) or two cliffs over a chasm (Bridge the Gap)
+    this.split = mods.twin ? mods.twin.gap : mods.bridge ? mods.bridge.gap : 0;
+    // a sloping pad (Hillside) is narrower, and raised so its low end is at the usual height
+    const padHalf = mods.tilt ? 7 + players * 0.3 : mods.hill ? 8.5 + players * 0.4 : 0;
+    const lift = (mods.soft ? 0.8 : 0) + (mods.tilt ? 1.0 : 0) + (mods.lava && !this.rafts ? 1.4 : 0)
+      + (mods.hill ? mods.hill.slope * padHalf : 0) + (mods.twin ? 0.9 : 0) + (mods.bridge ? 1.7 : 0);
     this.padTop = LAYOUT.padTop + lift;
     this.finishBase = finishHeight;
     this.finishHeight = finishHeight;
@@ -485,7 +496,7 @@ export class Sim {
     this.lineAmp = mods.moveLine ? mods.moveLine.amp : 0;
     this.lineFrozen = false;
     this.topY = this.finishY + this.lineAmp + 6.5;
-    this.layout = makeLayout(this.topY, players, { lift, padHalf: mods.tilt ? 7 + players * 0.3 : 0, raftTop: this.rafts ? () => this.raftTop() : null });
+    this.layout = makeLayout(this.topY, players, { lift, padHalf, raftTop: this.rafts ? () => this.raftTop() : null });
     this.barLimit = this.layout.halfW - 0.7;
     this.pieces = new Set();
     this.claws = new Map();      // slot -> Claw
@@ -501,9 +512,23 @@ export class Sim {
     // the lava: the game raises it over the round, up to just under the pad
     this.lavaTop = this.rafts ? this.padTop + mods.lava.upTo * finishHeight : this.padTop - 0.25 - this.softTravel - (mods.tilt ? Math.sin((mods.tilt.amp * Math.PI) / 180) * this.layout.padHalf : 0);
     this.lavaY = mods.lava ? -0.6 : -Infinity;
+    // the dangers that come and go (earthquakes, meteors, mixed-up controls) only happen while the game
+    // says so: during building, not in the lobby, the countdown or the hands-off checks
+    this.hazards = false;
+    this.belt = 0;               // now: the conveyor belt's speed (+ is to the right)
+    this.quake = mods.quake ? { next: 10, warned: false, start: -1, end: -1, x: 0 } : null;
+    this.meteor = mods.meteors ? { next: 8, warn: null } : null;
+    this.mixNext = 8;
 
     const ground = this.world.createBody({ type: 'static' });
-    ground.createFixture({ shape: new Box(this.layout.groundHalf, 1, Vec2(0, -1), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+    const gh = this.layout.groundHalf;
+    if (mods.bridge) {
+      // a bottomless chasm between the cliffs
+      const g = this.split / 2, w = (gh - g) / 2;
+      for (const sx of [-1, 1]) ground.createFixture({ shape: new Box(w, 1, Vec2(sx * (g + w), -1), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+    } else {
+      ground.createFixture({ shape: new Box(gh, 1, Vec2(0, -1), 0), friction: 0.9, filterCategoryBits: CAT.STATIC });
+    }
     ground.setUserData({ kind: 'ground' });
     this.ground = ground;
     this.buildPad();
@@ -513,10 +538,11 @@ export class Sim {
 
   // the build pad: a solid block, or springy jelly segments (soft), or a slab rocking on a pivot (tilt).
   // padBodies: what the tower stands on, with their half sizes (the TV draws them).
+  // (cx, cy: where the middle of the box is on its body)
   buildPad() {
     const half = this.layout.padHalf, top = this.padTop, mods = this.mods;
     this.padBodies = [];
-    const add = (body, hw, hh, kind) => { body.setUserData({ kind: 'pad' }); this.padBodies.push({ body, hw, hh, kind }); return body; };
+    const add = (body, hw, hh, kind, cx = 0, cy = 0) => { body.setUserData({ kind: 'pad' }); this.padBodies.push({ body, hw, hh, kind, cx, cy, x0: body.getPosition().x }); return body; };
     if (mods.tilt) {
       // a slab on a motorised hinge: strong enough to rock any tower, but (unlike something moved by
       // force of will) it stalls rather than crushing whatever gets caught under its end
@@ -549,10 +575,26 @@ export class Sim {
         this.world.createJoint(new PrismaticJoint({ enableLimit: true, lowerTranslation: -this.softTravel, upperTranslation: 0.05 }, this.ground, seg, Vec2(x, top - 0.2), Vec2(0, 1)));
         add(seg, w / 2 - 0.02, 0.2, 'soft').__rest = top - 0.2;
       }
-    } else {
+    } else if (mods.hill) {
+      // a slope rising to the right
+      const k = mods.hill.slope;
       const pad = this.world.createBody({ type: 'static' });
-      pad.createFixture({ shape: new Box(half, top / 2, Vec2(0, top / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC });
-      add(pad, half, top / 2, 'solid');
+      pad.createFixture({ shape: new Polygon([Vec2(-half, 0), Vec2(half, 0), Vec2(half, top + k * half), Vec2(-half, top - k * half)]), friction: 0.95, filterCategoryBits: CAT.STATIC });
+      add(pad, half, top / 2, 'hill');
+      this.padBodies[this.padBodies.length - 1].slope = k;
+    } else {
+      // a solid block (or two, with a gap between). An earthquake shakes it and a conveyor belt runs
+      // along its top, so then it's kinematic: it moves, but nothing pushes it around.
+      const moving = !!(mods.quake || mods.conveyor);
+      const g = this.split / 2;
+      const parts = g ? [[-(g + half) / 2, (half - g) / 2], [(g + half) / 2, (half - g) / 2]] : [[0, half]];
+      const kind = mods.conveyor ? 'belt' : mods.twin ? 'roof' : mods.bridge ? 'cliff' : 'solid';
+      for (const [cx, hw] of parts) {
+        const pad = this.world.createBody({ type: moving ? 'kinematic' : 'static', position: Vec2(cx, 0) });
+        pad.createFixture({ shape: new Box(hw, top / 2, Vec2(0, top / 2), 0), friction: 0.95, filterCategoryBits: CAT.STATIC });
+        add(pad, hw, top / 2, kind, 0, top / 2);
+      }
+      this.padMoves = moving;
     }
     this.pad = this.padBodies[0].body;
   }
@@ -760,7 +802,7 @@ export class Sim {
     const ud = otherBody.getUserData();
     if (piece.dead || ud?.kind !== 'piece') return; // glue only holds pieces (never the ground)
     const other = ud.piece;
-    if (other.dead || other === piece || !other.body.isDynamic() || other.special === 'balloon') return;
+    if (other.dead || other === piece || !other.body.isDynamic() || other.special === 'balloon' || other.special === 'meteor') return;
     if (piece.welds.some((w) => w.other === other)) return;
     if (piece.welds.length >= (piece.special === 'magnet' ? 8 : 6)) return;
     const a = piece.body.getWorldCenter(), b = other.body.getWorldCenter();
@@ -776,7 +818,7 @@ export class Sim {
     const knotY = pos.y - 0.55;
     let best = null, bestD = 2.2;
     for (const p of this.pieces) {
-      if (p === balloon || p.dead || p.special === 'balloon' || p.heldBy.size) continue;
+      if (p === balloon || p.dead || p.special === 'balloon' || p.special === 'meteor' || p.heldBy.size) continue;
       const c = p.body.getWorldCenter();
       if (c.y > pos.y + 0.3) continue;
       const d = Math.hypot(c.x - pos.x, p.top - knotY);
@@ -837,7 +879,7 @@ export class Sim {
     this.world.queryAABB(box, (fx) => {
       const ud = fx.getBody().getUserData();
       const o = ud?.kind === 'piece' ? ud.piece : null;
-      if (o && o !== piece && !o.dead && !o.heldBy.size && o.body.isDynamic() && o.special !== 'balloon') out.add(o);
+      if (o && o !== piece && !o.dead && !o.heldBy.size && o.body.isDynamic() && o.special !== 'balloon' && o.special !== 'meteor') out.add(o);
       return true;
     });
     return out;
@@ -860,6 +902,7 @@ export class Sim {
       const ud = x.getUserData();
       if (ud?.kind !== 'piece') continue;
       const p = ud.piece;
+      if (p.special === 'meteor' && !p.hitSomething) { p.hitSomething = true; this.queue.push(() => this.meteorHit(p, y)); }
       if (p.armed && (p.special === 'sticky' || (p.special === 'magnet' && p.clamped))) this.queue.push(() => this.weld(p, y));
     }
     // a sound and a wobble for anything that hits hard enough
@@ -893,7 +936,7 @@ export class Sim {
   measureTower() {
     const set = new Set();
     const queue = [];
-    const ok = (p) => p && !p.dead && !p.heldBy.size && p.body.isDynamic() && p.special !== 'balloon' && p.body.getLinearVelocity().length() < 1.6;
+    const ok = (p) => p && !p.dead && !p.heldBy.size && p.body.isDynamic() && p.special !== 'balloon' && p.special !== 'meteor' && p.body.getLinearVelocity().length() < 1.6;
     const pieceOf = (b) => { const ud = b.getUserData(); return ud?.kind === 'piece' ? ud.piece : null; };
     for (const pb of this.padBodies) {
       for (let ce = pb.body.getContactList(); ce; ce = ce.next) {
@@ -919,17 +962,41 @@ export class Sim {
     }
     let top = null, topY = this.padTop, sx = 0;
     for (const p of set) if (!graced.has(p)) p.inTowerAt = this.time; // (the grace runs out half a second after a real contact)
-    for (const p of set) {
-      const t = p.top;
-      sx += p.body.getWorldCenter().x;
-      if (t > topY) { topY = t; top = p; }
+    let sides = null;
+    if (this.mods.twin) {
+      // two towers: the lower one's height is what counts (each piece belongs to the rooftop it's over)
+      const s = [{ y: this.padTop, top: null, x: -this.layout.padHalf / 2, n: 0, sx: 0 }, { y: this.padTop, top: null, x: this.layout.padHalf / 2, n: 0, sx: 0 }];
+      for (const p of set) {
+        const c = p.body.getWorldCenter(), side = s[c.x < 0 ? 0 : 1];
+        side.n++; side.sx += c.x;
+        if (p.top > side.y) { side.y = p.top; side.top = p; }
+      }
+      for (const side of s) if (side.n) side.x = side.sx / side.n;
+      sides = s.map((side) => ({ x: side.x, h: Math.max(0, side.y - this.padTop), n: side.n }));
+      const low = s[0].y <= s[1].y ? s[0] : s[1];
+      topY = low.y; top = low.top;
+      for (const p of set) sx += p.body.getWorldCenter().x;
+    } else if (this.mods.bridge) {
+      // over the chasm: only pieces whose middle is above the gap count towards the height
+      const g = this.split / 2 + 0.25;
+      for (const p of set) {
+        const c = p.body.getWorldCenter();
+        sx += c.x;
+        if (Math.abs(c.x) < g && p.top > topY) { topY = p.top; top = p; }
+      }
+    } else {
+      for (const p of set) {
+        const t = p.top;
+        sx += p.body.getWorldCenter().x;
+        if (t > topY) { topY = t; top = p; }
+      }
     }
     // pieces that were in the tower and now aren't (and nobody picked them up) fell off
     for (const p of this.tower.set) {
       if (!set.has(p) && !p.heldBy.size && !p.dead) this.fallLog.push({ t: this.time, id: p.id });
     }
     const prevCount = this.tower.count;
-    this.tower = { height: Math.max(0, topY - this.padTop), count: set.size, top, set, x: set.size ? sx / set.size : 0, topY };
+    this.tower = { height: Math.max(0, topY - this.padTop), count: set.size, top, set, x: set.size ? sx / set.size : 0, topX: top ? top.body.getWorldCenter().x : 0, topY, sides };
 
     // collapse: a good part of a decent tower falling at once
     this.towerLog.push({ t: this.time, h: this.tower.height, n: set.size });
@@ -952,6 +1019,7 @@ export class Sim {
     this.stepMods(dt);
     this.stepSpecials();
     this.world.step(dt, 10, 6);
+    if (this.padMoves) for (const pb of this.padBodies) pb.body.setTransform(Vec2(pb.want, pb.wantY), 0);
     // a safety net: nothing flies faster than this (a piece or claw squeezed somewhere it can't be
     // would otherwise be shot out)
     for (let b = this.world.getBodyList(); b; b = b.getNext()) {
@@ -1034,6 +1102,40 @@ export class Sim {
         }
       }
     }
+    // the pad moving: an earthquake shakes it from side to side; a conveyor belt's top runs one way, slows
+    // and runs back. (A kinematic pad given the belt's speed drags whatever sits on it by friction, and
+    // is put back in place after each step, so it's the surface that moves, not the pad.)
+    if (this.padMoves) {
+      this.belt = m.conveyor ? m.conveyor.speed * Math.sin((2 * Math.PI * t) / m.conveyor.period) : 0;
+      const qx = this.stepQuake(dt);
+      const moving = qx !== this.quakeX || this.quakeY !== 0 || Math.abs(this.belt) > 0.01;
+      for (const pb of this.padBodies) {
+        pb.want = pb.x0 + qx;
+        pb.wantY = this.quakeY;
+        const at = pb.body.getPosition();
+        pb.body.setLinearVelocity(Vec2((pb.want - at.x) / dt + this.belt, (pb.wantY - at.y) / dt));
+        if (moving) for (let ce = pb.body.getContactList(); ce; ce = ce.next) ce.other.setAwake(true);
+      }
+      this.quakeX = qx;
+    }
+    // the night: lightning now and then (just a flash and a rumble)
+    if (m.dark && this.hazards && t >= (this.boltNext ?? 6)) {
+      this.boltNext = t + 10 + Math.random() * 12;
+      if (t > 6) this.emit({ type: 'lightning' });
+    }
+    // meteors: a target shows where the next one will land, then down it comes
+    if (this.meteor) this.stepMeteors(m.meteors);
+    // mixed-up claws: now and then someone's controls flip for a while
+    if (m.mixup && this.hazards && t >= this.mixNext) {
+      this.mixNext = t + m.mixup.min + Math.random() * (m.mixup.max - m.mixup.min);
+      const list = [...this.claws.values()].filter((c) => c.enabled && !c.boosted && c.flipUntil + 8 < t); // (and a break between flips)
+      if (list.length) {
+        const c = list[Math.floor(Math.random() * list.length)];
+        c.flipUntil = t + m.mixup.len;
+        c.flipBoth = Math.random() < 0.35;
+        this.emit({ type: 'flip', slot: c.slot, both: c.flipBoth, len: m.mixup.len });
+      }
+    } else if (m.mixup && !this.hazards) this.mixNext = Math.max(this.mixNext, t + 6);
     // unstable claws: now and then a grip slips (or lets go), or a rope stretches
     if (m.unstable) {
       for (const c of this.claws.values()) {
@@ -1050,6 +1152,74 @@ export class Sim {
         }
       }
     }
+  }
+
+  // the earthquake: warned about, then a few seconds of shaking (smoothly in and out). The pad's offset now.
+  stepQuake(dt) {
+    const q = this.quake;
+    this.quakeY = 0;
+    if (!q) return 0;
+    const Q = this.mods.quake, t = this.time + dt;
+    if (q.start < 0) {
+      // none starts in the lobby or while the tower is being judged, nor within 10 s of building resuming
+      if (!this.hazards) { q.next = Math.max(q.next, t + 10); q.warned = false; return 0; }
+      if (!q.warned && t >= q.next - 2.5) { q.warned = true; this.emit({ type: 'quakewarn' }); }
+      if (t < q.next) return 0;
+      q.start = t; q.end = t + Q.len;
+      this.emit({ type: 'quake', len: Q.len });
+    }
+    if (t >= q.end) {
+      q.start = -1; q.warned = false;
+      q.next = t + Q.every * (0.8 + Math.random() * 0.4);
+      return 0;
+    }
+    const u = (t - q.start) / Q.len, env = Math.sin(Math.PI * u) ** 2, w = 2 * Math.PI * Q.hz * (t - q.start);
+    this.quakeY = (Q.ay || 0) * env * (1 - Math.cos(2 * w)) / 2; // and a little jolting up and down (never below rest)
+    return Q.amp * env * Math.sin(w);
+  }
+
+  get quaking() { return !!this.quake && this.quake.start >= 0; }
+
+  stepMeteors(M) {
+    const ms = this.meteor, t = this.time;
+    if (!this.hazards) { ms.next = Math.max(ms.next, t + 6); ms.warn = null; return; }
+    if (!ms.warn && t >= ms.next - 2.2) {
+      // most aim at the top of the tower, the rest anywhere over the pad
+      const top = this.tower.top;
+      const half = this.layout.padHalf - 1;
+      const x = top && this.tower.count >= 3 && Math.random() < 0.6 ? top.body.getWorldCenter().x + (Math.random() - 0.5) * 1.2 : (Math.random() * 2 - 1) * half;
+      ms.warn = { x: clamp(x, -half, half), at: ms.next };
+      this.emit({ type: 'meteorwarn', x: ms.warn.x });
+    }
+    if (ms.warn && t >= ms.next) {
+      const p = new Piece(this, 'meteor', -1, ms.warn.x, this.topY - 0.9, 0);
+      p.body.setLinearVelocity(Vec2(0, -3));
+      this.pieces.add(p);
+      this.emit({ type: 'meteorfall', piece: p.id, x: ms.warn.x });
+      ms.warn = null;
+      ms.next = t + M.min + Math.random() * (M.max - M.min);
+    }
+  }
+
+  // a meteor hit something: a claw blocks it, a wooden (burnable) piece burns, anything else just gets a knock
+  meteorHit(meteor, other) {
+    if (meteor.dead) return;
+    const pos = meteor.body.getPosition().clone();
+    const ud = other.getUserData();
+    let hit = 'ground';
+    if (ud?.kind === 'claw') hit = 'claw';
+    else if (ud?.kind === 'piece' && !ud.piece.dead && ud.piece.special !== 'meteor') {
+      const o = ud.piece;
+      hit = 'piece';
+      if (MATERIALS[o.mat].burns && !o.special && !o.parked && !o.heldBy.size) {
+        const q = o.body.getPosition();
+        this.removePiece(o, 'burn');
+        this.emit({ type: 'burn', x: q.x, y: q.y });
+        hit = 'burn';
+      }
+    }
+    this.removePiece(meteor, 'meteor');
+    this.emit({ type: 'meteor', x: pos.x, y: pos.y, hit, slot: ud?.kind === 'claw' ? ud.claw.slot : -1 });
   }
 
   slowStep() {

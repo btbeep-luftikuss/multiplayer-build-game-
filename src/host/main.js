@@ -164,7 +164,7 @@ function sendSettings(p) {
 function resultFor(p) {
   const r = game.result;
   const me = r.players.find((x) => x.slot === p.slot);
-  const lv = r.level ? { id: r.level.id, name: r.level.name, time: r.level.time, best: !!r.newBest, unlocked: r.unlocked || null, next: r.next || null } : null;
+  const lv = r.level ? { id: r.level.id, name: r.level.name, time: r.level.time, best: !!r.newBest, unlocked: r.unlocked || null, next: r.next || null, remixOpen: !!r.remixOpen, allDone: !!r.allDone } : null;
   return { t: 'res', lv, ok: r.success, early: r.early, left: Math.ceil(r.timeLeft), h: r.height, f: Math.round(r.finish * 10) / 10, stars: r.stars, placed: me?.placed || 0, awards: r.awards.filter((a) => a.slot === p.slot).map((a) => a.title) };
 }
 
@@ -180,10 +180,12 @@ function relay(e) {
     if (p) { net.send(p.id, { t: 'buzz', p: [120, 40, 60] }); net.send(p.id, { t: 'toast', text: { slip: 'Your grip slipped!', stretch: 'Your rope stretched!', drop: 'Your claw let go!' }[e.kind] }); }
   }
   if (e.type === 'boost') { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: [30, 30, 30, 30, 200] }); }
+  if (e.type === 'flip') { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: [60, 40, 60, 40, 60] }); }
   if (BUZZ[e.type] && e.slot !== undefined) { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: BUZZ[e.type] }); }
   if (e.type === 'powerup') { const p = bySlot(e.slot); if (p) net.send(p.id, { t: 'buzz', p: [40, 60, 40, 60, 120] }); }
   const all = (msg) => { for (const p of game.players.values()) if (p.connected) net.send(p.id, msg); };
   if (e.type === 'go') all({ t: 'buzz', p: [200] });
+  if (e.type === 'quakewarn') all({ t: 'buzz', p: [400, 100, 400] });
   if (e.type === 'timeup' || e.type === 'hold') all({ t: 'buzz', p: [300] });
   if (e.type === 'holdfail') all({ t: 'buzz', p: [150, 80, 150] });
   if (e.type === 'collapse') all({ t: 'buzz', p: [150, 80, 150] });

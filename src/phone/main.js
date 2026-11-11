@@ -2,6 +2,7 @@
 // and shows what your claw is doing. Nothing is simulated here.
 import { joinRoom, cleanCode } from '../net/net.js';
 import { PIECES, SHAPES, MATERIALS, outlineOf } from '../shared/pieces.js';
+import { REMIX_AFTER } from '../shared/levels.js';
 import css from '../styles/phone.css';
 
 const params = new URLSearchParams(location.search);
@@ -143,7 +144,16 @@ function onStatus(s) {
   $('#pad .hgt').classList.toggle('over', s.h >= s.f);
   const state = $('#pad .claw-state');
   state.className = 'claw-state ' + ['open', 'closed', 'holding'][s.g];
-  state.innerHTML = (s.bo ? `⚡${s.bo} ` : '') + (s.g === 2 ? `✊ ${esc(s.hn)}` : s.g === 1 ? '✊ closed' : '✋ open');
+  state.innerHTML = (s.fx ? '🔀 ' : '') + (s.bo ? `⚡${s.bo} ` : '') + (s.g === 2 ? `✊ ${esc(s.hn)}` : s.g === 1 ? '✊ closed' : '✋ open');
+  // Mixed-up claws: the pad shows when left and right (and maybe up and down) are swapped
+  const stick = $('#pad .stick.both');
+  stick.classList.toggle('flipped', !!s.fx);
+  if (stick._fx !== (s.fx || 0)) {
+    stick._fx = s.fx || 0;
+    $('.label', stick).innerHTML = s.fx
+      ? `<span class="v">${s.fx === 2 ? '▼ rope DOWN' : '▲ rope up'}</span><span class="h">🔀 ▶ FLIPPED ◀</span><span class="v">${s.fx === 2 ? '▲ rope UP' : '▼ rope down'}</span>`
+      : '<span class="v">▲ rope up</span><span class="h">◀ MOVE ▶</span><span class="v">▼ rope down</span>';
+  }
   const grab = $('#pad .grab');
   grab.textContent = s.g === 2 ? 'LET GO' : s.g === 1 ? 'OPEN' : 'GRAB';
   grab.classList.toggle('holding', s.g === 2);
@@ -341,7 +351,7 @@ function renderOverlay() {
       html += '<div class="levels">' + lvInfo.list.map((l) => {
         const locked = l.id > lvInfo.unlocked;
         return `<button class="lv ${lvInfo.level === l.id ? 'sel' : ''} ${l.done ? 'done' : ''}" ${locked ? 'disabled' : ''} data-level="${l.id}"><b>${l.id}</b> ${locked ? '🔒' : l.icon} ${esc(l.name)}${l.done ? ` <span class="best">✓ ${l.best !== null ? fmtTime(l.best) : ''}</span>` : ''}</button>`;
-      }).join('') + `<button class="lv ${lvInfo.level === 'remix' ? 'sel' : ''}" ${lvInfo.remix ? '' : 'disabled'} data-level="remix">${lvInfo.remix ? '🎲' : '🔒'} Endless Remix${lvInfo.remix ? ` <span class="best">${lvInfo.remixWins} won</span>` : ' <span class="best">beat Level 10</span>'}</button></div>`;
+      }).join('') + `<button class="lv ${lvInfo.level === 'remix' ? 'sel' : ''}" ${lvInfo.remix ? '' : 'disabled'} data-level="remix">${lvInfo.remix ? '🎲' : '🔒'} Endless Remix${lvInfo.remix ? ` <span class="best">${lvInfo.remixWins} won</span>` : ` <span class="best">beat Level ${REMIX_AFTER}</span>`}</button></div>`;
       html += '<button class="big" data-act="close">Done</button>';
     } else html += '<h2>Settings</h2>' + Object.entries(SETTINGS).map(([k, s]) => `<div class="setting"><div class="t">${s.title}</div><div class="opts">${s.opts.map((v) => `<button class="${cfg[k] === v ? 'sel' : ''}" data-set="${k}" data-val='${JSON.stringify(v)}'>${s.show(v)}</button>`).join('')}</div></div>`).join('') + '<button class="big" data-act="close">Done</button>';
   } else if (st?.ph === 'result' && result && result.lv && !resultHidden) {
@@ -349,7 +359,8 @@ function renderOverlay() {
     html = `<h2 class="${result.ok ? 'win' : 'lose'}">${result.ok ? 'LEVEL COMPLETE!' : 'LEVEL FAILED'}</h2>` +
       `<p>${L.id === 'remix' ? 'Endless Remix' : 'Level ' + L.id}: ${esc(L.name)}</p>` +
       (result.ok ? `<p>in <b>${fmtTime(L.time)}</b>${L.best ? ' · <b>new best!</b>' : ''}</p>` : `<p>${result.h.toFixed(1)} m of ${result.f.toFixed(1)} m</p>`) +
-      (L.unlocked ? `<p class="awards">🔓 ${L.unlocked === 'remix' ? 'Endless Remix' : 'Level ' + L.unlocked} unlocked!</p>` : '') +
+      (L.unlocked ? `<p class="awards">🔓 ${L.unlocked === 'remix' ? 'Endless Remix' : 'Level ' + L.unlocked}${L.remixOpen ? ' and the Endless Remix' : ''} unlocked!</p>` : '') +
+      (L.allDone ? '<p class="awards">🏆 Every level beaten!</p>' : '') +
       (st.ld
         ? (result.ok && L.next ? `<button class="big" data-act="next">${L.next === 'remix' ? 'Endless Remix ▶' : 'Next level ▶'}</button><button data-act="again">Retry</button>` : `<button class="big" data-act="again">Retry</button>`) + `<button data-act="lobby">Level select</button>`
         : `<p class="small">Waiting for the leader…</p>`) +

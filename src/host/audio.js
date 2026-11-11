@@ -279,6 +279,12 @@ export class Sound {
       case 'burn': this.noise({ dur: 0.5, vol: 0.3, type: 'highpass', freq: 2500, sweep: 6000 }); this.tone({ f: 120, f2: 60, dur: 0.3, vol: 0.15 }); break;
       case 'shatter': for (let i = 0; i < 6; i++) this.tone({ f: 2000 + Math.random() * 3000, dur: 0.2, vol: 0.08, when: i * 0.03 }); this.noise({ dur: 0.15, vol: 0.3, type: 'highpass', freq: 3500 }); break;
       case 'glitch': this.tone({ type: 'square', f: 300, f2: 120, dur: 0.25, vol: 0.1, lp: 1500 }); break;
+      case 'quakewarn': this.noise({ dur: 2.2, vol: 0.18, type: 'lowpass', freq: 140 }); this.warn(); break;
+      case 'quake': this.noise({ dur: 4, vol: 0.4, type: 'lowpass', freq: 110 }); this.tone({ f: 45, f2: 35, dur: 3.5, vol: 0.2 }); break;
+      case 'meteorwarn': this.tone({ type: 'sine', f: 1800, f2: 500, dur: 1.8, vol: 0.06 }); break;
+      case 'meteor': this.noise({ dur: 0.6, vol: 0.4, type: 'lowpass', freq: 600 }); this.tone({ f: 90, f2: 40, dur: 0.4, vol: 0.25 }); break;
+      case 'lightning': this.noise({ dur: 2.5, vol: 0.35, type: 'lowpass', freq: 300, when: 0.25 }); break;
+      case 'flip': this.tone({ type: 'triangle', f: 300, f2: 900, dur: 0.18, vol: 0.12 }); this.tone({ type: 'triangle', f: 900, f2: 300, dur: 0.18, vol: 0.12, when: 0.18 }); break;
       case 'boost': this.tone({ type: 'sawtooth', f: 200, f2: 1600, dur: 0.5, vol: 0.12, lp: 3000 }); this.powerup(); break;
       case 'holdcount': this.tick(e.n); break;
       case 'holdfail': this.crash(); break;
